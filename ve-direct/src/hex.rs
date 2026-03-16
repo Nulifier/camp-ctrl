@@ -17,14 +17,6 @@ bitflags! {
 
 		const _ = !0;
 	}
-
-	#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-	pub struct Capabilities: u32 {
-		const LOAD_OUTPUT = 0b0000_0000_0000_0000_0000_0000_0000_0001;
-		const ROTARY_ENCODER = 0b0000_0000_0000_0000_0000_0000_0000_0010;
-		const HISTORY_SUPPORT = 0b0000_0000_0000_0000_0000_0000_0000_0100;
-		const BATTERYSAFE_MODE = 0b0000_0000_0000_0000_0000_0000_0000_1000;
-	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

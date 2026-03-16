@@ -171,11 +171,6 @@ pub fn is_checksum_label(label: &[u8]) -> bool {
 	label.eq_ignore_ascii_case(CHECKSUM_LABEL.as_bytes())
 }
 
-fn split_record(line: &[u8]) -> Option<(&[u8], &[u8])> {
-	let separator = line.iter().position(|byte| *byte == FIELD_SEPARATOR)?;
-	Some((&line[..separator], &line[separator + 1..]))
-}
-
 fn parse_i32(bytes: &[u8]) -> Result<i32, TextError> {
 	let value = str::from_utf8(bytes).map_err(|_| TextError::InvalidValueUtf8)?;
 	value.parse::<i32>().map_err(|_| TextError::InvalidInteger)
