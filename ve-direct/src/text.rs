@@ -42,18 +42,132 @@ impl<'a> Record<'a> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KnownLabel {
-	Pid,
-	Voltage,
-	Current,
+	/// Main or channel 1 (battery) voltage (mV)
+	Voltage1,
+	/// Channel 2 (battery) voltage (mV)
+	Voltage2,
+	/// Channel 3 (battery) voltage (mV)
+	Voltage3,
+	/// Auxiliary (starter) voltage (mV)
+	VoltageAux,
+	/// Mid-point voltage of the battery bank (mV)
+	VoltageMidPoint,
+	/// Mid-point deviation of the battery bank (0.1%)
+	VoltageMidPointDeviation,
+	/// Panel voltage (mV)
 	PanelVoltage,
+	/// Panel power (W)
 	PanelPower,
+	/// Main or channel 1 battery current (mA)
+	Current1,
+	/// Channel 2 battery current (mA)
+	Current2,
+	/// Channel 3 battery current (mA)
+	Current3,
+	/// Load current (mA)
+	LoadCurrent,
+	/// Load output state (ON/OFF)
+	LoadOutputState,
+	/// Battery temperature (°C)
+	BatteryTemperature,
+	/// Instantaneous power (W)
+	Power,
+	/// Consumed amp hours (mAh)
+	ConsumedAmpHours,
+	/// State-of-charge (0.1%)
 	StateOfCharge,
-	ChargeState,
-	TrackerState,
+	/// Time-to-go (minutes)
+	TimeToGo,
+	/// Alarm condition active
+	AlarmCondition,
+	/// Relay state
+	RelayState,
+	/// Alarm reason
+	AlarmReason,
+	/// Off reason
+	OffReason,
+	/// Depth of the deepest discharge (mAh)
+	DeepestDischargeDepth,
+	/// Depth of the last discharge (mAh)
+	LastDischargeDepth,
+	/// Depth of the average discharge (mAh)
+	AverageDischargeDepth,
+	/// Number of charge cycles
+	ChargeCycles,
+	/// Number of full discharges
+	FullDischarges,
+	/// Cumulative amp hours drawn (mAh)
+	CumulativeAmpHours,
+	/// Minimum main (battery) voltage (mV)
+	MinVoltage1,
+	/// Maximum main (battery) voltage (mV)
+	MaxVoltage1,
+	/// Number of seconds since last full charge (seconds)
+	SecondsSinceFullCharge,
+	/// Number of automatic synchronizations
+	AutomaticSynchronizations,
+	/// Number of low main voltage alarms
+	LowVoltageAlarms,
+	/// Number of high main voltage alarms
+	HighVoltageAlarms,
+	/// Number of low auxiliary voltage alarms
+	LowAuxVoltageAlarms,
+	/// Number of high auxiliary voltage alarms
+	HighAuxVoltageAlarms,
+	/// Minimum auxiliary (battery) voltage (mV)
+	MinVoltageAux,
+	/// Maximum auxiliary (battery) voltage (mV)
+	MaxVoltageAux,
+	/// Amount of discharged energy (BMV) / Amount of produced energy (DC monitor) (0.01 kWh)
+	Energy,
+	/// Amount of charged energy (BMV) / Amount of consumed energy (DC monitor) (0.01 kWh)
+	ChargedEnergy,
+	/// Yield total (user resettable counter) (0.01kWh)
+	YieldTotal,
+	/// Yield today (0.01kWh)
+	YieldToday,
+	/// Maximum power today (W)
+	MaxPowerToday,
+	/// Yield yesterday (0.01kWh)
+	YieldYesterday,
+	/// Maximum power yesterday (W)
+	MaxPowerYesterday,
+	/// Error code
 	ErrorCode,
+	/// State of operation
+	StateOfOperation,
+	/// Model description (deprecated)
+	ModelDescription,
+	/// Firmware version (16 bit)
+	FirmwareVersion16,
+	/// Firmware version (24 bit)
+	FirmwareVersion24,
+	/// Product ID
+	ProductId,
+	/// Serial number
+	SerialNumber,
+	/// Day sequence number (0..364)
 	DaySequence,
-	Relay,
-	Load,
+	/// Device mode
+	DeviceMode,
+	/// AC output voltage (0.01 V)
+	AcOutputVoltage,
+	/// AC output current (0.1 A)
+	AcOutputCurrent,
+	/// AC output apparent power (VA)
+	AcOutputApparentPower,
+	/// Warning reason
+	WarningReason,
+	/// Tracker operation mode
+	TrackerOperationMode,
+	/// DC monitor mode
+	DcMonitorMode,
+	/// DC input voltage (0.01 V)
+	DcInputVoltage,
+	/// DC input current (0.1 A)
+	DcInputCurrent,
+	/// DC input power (W)
+	DcInputPower,
 	Checksum,
 	Unknown,
 }
@@ -61,18 +175,69 @@ pub enum KnownLabel {
 impl KnownLabel {
 	pub fn from_label(label: &str) -> Self {
 		match label {
-			"PID" => Self::Pid,
-			"V" => Self::Voltage,
-			"I" => Self::Current,
+			"V" => Self::Voltage1,
+			"V2" => Self::Voltage2,
+			"V3" => Self::Voltage3,
+			"VS" => Self::VoltageAux,
+			"VM" => Self::VoltageMidPoint,
+			"DM" => Self::VoltageMidPointDeviation,
 			"VPV" => Self::PanelVoltage,
 			"PPV" => Self::PanelPower,
+			"I" => Self::Current1,
+			"I2" => Self::Current2,
+			"I3" => Self::Current3,
+			"IL" => Self::LoadCurrent,
+			"LOAD" => Self::LoadOutputState,
+			"T" => Self::BatteryTemperature,
+			"P" => Self::Power,
+			"CE" => Self::ConsumedAmpHours,
 			"SOC" => Self::StateOfCharge,
-			"CS" => Self::ChargeState,
-			"MPPT" => Self::TrackerState,
+			"TTG" => Self::TimeToGo,
+			"Alarm" => Self::AlarmCondition,
+			"Relay" => Self::RelayState,
+			"AR" => Self::AlarmReason,
+			"OR" => Self::OffReason,
+			"H1" => Self::DeepestDischargeDepth,
+			"H2" => Self::LastDischargeDepth,
+			"H3" => Self::AverageDischargeDepth,
+			"H4" => Self::ChargeCycles,
+			"H5" => Self::FullDischarges,
+			"H6" => Self::CumulativeAmpHours,
+			"H7" => Self::MinVoltage1,
+			"H8" => Self::MaxVoltage1,
+			"H9" => Self::SecondsSinceFullCharge,
+			"H10" => Self::AutomaticSynchronizations,
+			"H11" => Self::LowVoltageAlarms,
+			"H12" => Self::HighVoltageAlarms,
+			"H13" => Self::LowAuxVoltageAlarms,
+			"H14" => Self::HighAuxVoltageAlarms,
+			"H15" => Self::MinVoltageAux,
+			"H16" => Self::MaxVoltageAux,
+			"H17" => Self::Energy,
+			"H18" => Self::ChargedEnergy,
+			"H19" => Self::YieldTotal,
+			"H20" => Self::YieldToday,
+			"H21" => Self::MaxPowerToday,
+			"H22" => Self::YieldYesterday,
+			"H23" => Self::MaxPowerYesterday,
 			"ERR" => Self::ErrorCode,
+			"CS" => Self::StateOfOperation,
+			"BMV" => Self::ModelDescription,
+			"FW" => Self::FirmwareVersion16,
+			"FWE" => Self::FirmwareVersion24,
+			"PID" => Self::ProductId,
+			"SER#" => Self::SerialNumber,
 			"HSDS" => Self::DaySequence,
-			"Relay" => Self::Relay,
-			"LOAD" => Self::Load,
+			"MODE" => Self::DeviceMode,
+			"AC_OUT_V" => Self::AcOutputVoltage,
+			"AC_OUT_I" => Self::AcOutputCurrent,
+			"AC_OUT_S" => Self::AcOutputApparentPower,
+			"WARN" => Self::WarningReason,
+			"MPPT" => Self::TrackerOperationMode,
+			"MON" => Self::DcMonitorMode,
+			"DC_IN_V" => Self::DcInputVoltage,
+			"DC_IN_I" => Self::DcInputCurrent,
+			"DC_IN_P" => Self::DcInputPower,
 			CHECKSUM_LABEL => Self::Checksum,
 			_ => Self::Unknown,
 		}
@@ -141,44 +306,27 @@ impl Snapshot {
 
 	pub fn apply_record(&mut self, record: Record<'_>) -> Result<(), TextError> {
 		match record.known_label() {
-			KnownLabel::Voltage => self.battery_voltage_mv = Some(record.value_as_i32()?),
-			KnownLabel::Current => self.battery_current_ma = Some(record.value_as_i32()?),
-			KnownLabel::PanelVoltage => self.panel_voltage_mv = Some(record.value_as_i32()?),
-			KnownLabel::PanelPower => self.panel_power_w = Some(record.value_as_i32()?),
-			KnownLabel::StateOfCharge => self.soc_permille = Some(record.value_as_u16()?),
-			KnownLabel::ChargeState => self.charge_state = Some(record.value_as_i32()?),
-			KnownLabel::TrackerState => self.tracker_state = Some(record.value_as_i32()?),
-			KnownLabel::ErrorCode => self.error_code = Some(record.value_as_i32()?),
-			KnownLabel::DaySequence => self.day_sequence = Some(record.value_as_u16()?),
-			KnownLabel::Relay => self.relay_on = Some(record.value_as_bool()?),
-			KnownLabel::Load => self.load_on = Some(record.value_as_bool()?),
-			KnownLabel::Pid | KnownLabel::Checksum | KnownLabel::Unknown => {}
+			KnownLabel::Voltage1 => self.battery_voltage_mv = Some(record.value_as_i32()?),
+			KnownLabel::Checksum | KnownLabel::Unknown => {}
+			_ => {}
 		}
 
 		Ok(())
 	}
 }
 
-pub fn checksum_sum(block: &[u8]) -> u8 {
-	block.iter().fold(0u8, |acc, byte| acc.wrapping_add(*byte))
-}
-
-pub fn has_valid_checksum(block: &[u8]) -> bool {
-	checksum_sum(block) == 0
-}
-
 pub fn is_checksum_label(label: &[u8]) -> bool {
 	label.eq_ignore_ascii_case(CHECKSUM_LABEL.as_bytes())
-}
-
-fn parse_i32(bytes: &[u8]) -> Result<i32, TextError> {
-	let value = str::from_utf8(bytes).map_err(|_| TextError::InvalidValueUtf8)?;
-	value.parse::<i32>().map_err(|_| TextError::InvalidInteger)
 }
 
 fn parse_u16(bytes: &[u8]) -> Result<u16, TextError> {
 	let value = str::from_utf8(bytes).map_err(|_| TextError::InvalidValueUtf8)?;
 	value.parse::<u16>().map_err(|_| TextError::InvalidInteger)
+}
+
+fn parse_i32(bytes: &[u8]) -> Result<i32, TextError> {
+	let value = str::from_utf8(bytes).map_err(|_| TextError::InvalidValueUtf8)?;
+	value.parse::<i32>().map_err(|_| TextError::InvalidInteger)
 }
 
 #[cfg(test)]
