@@ -1,4 +1,4 @@
-use bitflags::bitflags;
+use bitflags::{Flags, bitflags};
 use core::fmt;
 use heapless::String;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -287,6 +287,25 @@ impl EncodeValue for u16 {
 	}
 }
 
+impl DecodeValue for u32 {
+	fn decode(bytes: &[u8]) -> Result<Self, RegisterError> {
+		expect_len(bytes, 4)?;
+		Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+	}
+}
+
+impl EncodeValue for u32 {
+	fn encoded_len(&self) -> usize {
+		4
+	}
+
+	fn encode_into<'a>(&self, out: &'a mut [u8]) -> Result<&'a [u8], RegisterError> {
+		require_buffer(out, 4)?;
+		out[..4].copy_from_slice(&self.to_le_bytes());
+		Ok(&out[..4])
+	}
+}
+
 mod private {
 	pub trait Sealed {}
 }
@@ -299,6 +318,11 @@ where
 	Self: Into<<Self as TryFromPrimitive>::Primitive>,
 {
 }
+
+/// Marker trait for bitflags types with primitive bits (`u8`/`u16`/`u32`).
+/// Implement this (along with `private::Sealed`) and use `impl_bitflags_value!`
+/// to get `DecodeValue` and `EncodeValue` impls.
+pub trait ReprBitflags: private::Sealed + Flags + Copy {}
 
 impl<T> DecodeValue for T
 where
@@ -325,6 +349,37 @@ where
 		let raw: <T as TryFromPrimitive>::Primitive = (*self).into();
 		raw.encode_into(out)
 	}
+}
+
+macro_rules! impl_bitflags_value {
+	($type:ty) => {
+		impl private::Sealed for $type {}
+		impl ReprBitflags for $type {}
+		impl DecodeValue for $type
+		where
+			$type: ReprBitflags,
+			<$type as Flags>::Bits: DecodeValue + Into<u32>,
+		{
+			fn decode(bytes: &[u8]) -> Result<Self, RegisterError> {
+				let raw = <$type as Flags>::Bits::decode(bytes)?;
+				<$type>::from_bits(raw).ok_or(RegisterError::InvalidEnum(raw.into()))
+			}
+		}
+
+		impl EncodeValue for $type
+		where
+			$type: ReprBitflags,
+			<$type as Flags>::Bits: EncodeValue,
+		{
+			fn encoded_len(&self) -> usize {
+				self.bits().encoded_len()
+			}
+
+			fn encode_into<'a>(&self, out: &'a mut [u8]) -> Result<&'a [u8], RegisterError> {
+				self.bits().encode_into(out)
+			}
+		}
+	};
 }
 
 pub const MAX_STRING_LENGTH: usize = 32;
@@ -441,25 +496,7 @@ bitflags! {
 	}
 }
 
-impl DecodeValue for Capabilities {
-	fn decode(bytes: &[u8]) -> Result<Self, RegisterError> {
-		expect_len(bytes, 4)?;
-		let bits = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-		Capabilities::from_bits(bits).ok_or(RegisterError::InvalidEnum(bits))
-	}
-}
-
-impl EncodeValue for Capabilities {
-	fn encoded_len(&self) -> usize {
-		4
-	}
-
-	fn encode_into<'a>(&self, out: &'a mut [u8]) -> Result<&'a [u8], RegisterError> {
-		require_buffer(out, 4)?;
-		out[..4].copy_from_slice(&self.bits().to_le_bytes());
-		Ok(&out[..4])
-	}
-}
+impl_bitflags_value!(Capabilities);
 
 pub struct CapabilitiesRegister;
 impl Register for CapabilitiesRegister {
@@ -584,25 +621,7 @@ bitflags! {
 	}
 }
 
-impl DecodeValue for DeviceOffReason {
-	fn decode(bytes: &[u8]) -> Result<Self, RegisterError> {
-		expect_len(bytes, 4)?;
-		let bits = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-		DeviceOffReason::from_bits(bits).ok_or(RegisterError::InvalidEnum(bits))
-	}
-}
-
-impl EncodeValue for DeviceOffReason {
-	fn encoded_len(&self) -> usize {
-		4
-	}
-
-	fn encode_into<'a>(&self, out: &'a mut [u8]) -> Result<&'a [u8], RegisterError> {
-		require_buffer(out, 4)?;
-		out[..4].copy_from_slice(&self.bits().to_le_bytes());
-		Ok(&out[..4])
-	}
-}
+impl_bitflags_value!(DeviceOffReason);
 
 pub struct DeviceOffReasonRegister;
 impl Register for DeviceOffReasonRegister {
