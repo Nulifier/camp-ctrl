@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["ve-direct"]
+members = ["hmi","ve-direct"]

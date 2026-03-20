@@ -23,8 +23,8 @@ impl<'a> Record<'a> {
 		str::from_utf8(self.value).map_err(|_| TextError::InvalidValueUtf8)
 	}
 
-	pub fn value_as_i32(&self) -> Result<i32, TextError> {
-		parse_i32(self.value)
+	pub fn value_as_u32(&self) -> Result<u32, TextError> {
+		parse_u32(self.value)
 	}
 
 	pub fn value_as_u16(&self) -> Result<u16, TextError> {
@@ -270,33 +270,15 @@ impl std::error::Error for TextError {}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Snapshot {
-	pub battery_voltage_mv: Option<i32>,
-	pub battery_current_ma: Option<i32>,
-	pub panel_voltage_mv: Option<i32>,
-	pub panel_power_w: Option<i32>,
-	pub soc_permille: Option<u16>,
-	pub charge_state: Option<i32>,
-	pub tracker_state: Option<i32>,
-	pub error_code: Option<i32>,
-	pub day_sequence: Option<u16>,
-	pub relay_on: Option<bool>,
-	pub load_on: Option<bool>,
+	pub voltage_mv: [Option<u32>; 3],
+	pub voltage_aux_mv: Option<u32>,
 }
 
 impl Snapshot {
 	pub const fn new() -> Self {
 		Self {
-			battery_voltage_mv: None,
-			battery_current_ma: None,
-			panel_voltage_mv: None,
-			panel_power_w: None,
-			soc_permille: None,
-			charge_state: None,
-			tracker_state: None,
-			error_code: None,
-			day_sequence: None,
-			relay_on: None,
-			load_on: None,
+			voltage_mv: [None, None, None],
+			voltage_aux_mv: None,
 		}
 	}
 
@@ -306,7 +288,10 @@ impl Snapshot {
 
 	pub fn apply_record(&mut self, record: Record<'_>) -> Result<(), TextError> {
 		match record.known_label() {
-			KnownLabel::Voltage1 => self.battery_voltage_mv = Some(record.value_as_i32()?),
+			KnownLabel::Voltage1 => self.voltage_mv[0] = Some(record.value_as_u32()?),
+			KnownLabel::Voltage2 => self.voltage_mv[1] = Some(record.value_as_u32()?),
+			KnownLabel::Voltage3 => self.voltage_mv[2] = Some(record.value_as_u32()?),
+			KnownLabel::VoltageAux => self.voltage_aux_mv = Some(record.value_as_u32()?),
 			KnownLabel::Checksum | KnownLabel::Unknown => {}
 			_ => {}
 		}
@@ -324,9 +309,9 @@ fn parse_u16(bytes: &[u8]) -> Result<u16, TextError> {
 	value.parse::<u16>().map_err(|_| TextError::InvalidInteger)
 }
 
-fn parse_i32(bytes: &[u8]) -> Result<i32, TextError> {
+fn parse_u32(bytes: &[u8]) -> Result<u32, TextError> {
 	let value = str::from_utf8(bytes).map_err(|_| TextError::InvalidValueUtf8)?;
-	value.parse::<i32>().map_err(|_| TextError::InvalidInteger)
+	value.parse::<u32>().map_err(|_| TextError::InvalidInteger)
 }
 
 #[cfg(test)]
