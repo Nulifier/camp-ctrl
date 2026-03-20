@@ -1,0 +1,3 @@
+[submodule "hmi/vendor/lvgl"]
+	path = hmi/vendor/lvgl
+	url = https://github.com/lvgl/lvgl.git

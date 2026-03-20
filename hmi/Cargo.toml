@@ -1,0 +1,13 @@
+[package]
+name = "hmi"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+cstr_core = "0.2.6"
+embedded-graphics = "0.7.1"
+embedded-graphics-simulator = "0.4.0"
+
+[build-dependencies]
+cc = "1"
