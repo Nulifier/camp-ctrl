@@ -8,6 +8,8 @@ build = "build.rs"
 cstr_core = "0.2.6"
 embedded-graphics = "0.7.1"
 embedded-graphics-simulator = "0.4.0"
+lvgl-sys = { path = "../lvgl-sys" }
 
 [build-dependencies]
 cc = "1"
+pkg-config = "0.3"
