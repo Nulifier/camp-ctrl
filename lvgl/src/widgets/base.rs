@@ -5,7 +5,7 @@ use crate::event::{Event, EventCode, EventHandle};
 use crate::misc::area::{Align, Area, Point};
 use crate::misc::color::{Color, Opacity};
 use crate::misc::grad::{GradDir, GradientDescriptor};
-use crate::style::Style;
+use crate::style::{BorderSide, ImageColorKey, Style, TextDecor};
 use bitflags::bitflags;
 use core::ptr::NonNull;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -632,6 +632,214 @@ pub trait Widget: AsRawObj {
 			lvgl_sys::lv_obj_set_style_bg_image_recolor(
 				self.as_raw_ptr(),
 				recolor.as_raw(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_bg_image_recolor_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_bg_image_recolor_opa(
+				self.as_raw_ptr(),
+				opa.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_bg_image_tiled(&mut self, tiled: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_bg_image_tiled(self.as_raw_ptr(), tiled, selector.0) };
+	}
+
+	fn set_style_border_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_border_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_border_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_border_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	fn set_style_border_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_border_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_border_side(&mut self, side: BorderSide, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_border_side(self.as_raw_ptr(), side.bits(), selector.0)
+		};
+	}
+
+	fn set_style_border_post(&mut self, post: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_border_post(self.as_raw_ptr(), post, selector.0) };
+	}
+
+	fn set_style_outline_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_outline_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_outline_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_outline_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_outline_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_outline_opa(self.as_raw_ptr(), opa.into(), selector.0)
+		};
+	}
+
+	fn set_style_outline_pad(&mut self, pad: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_outline_pad(self.as_raw_ptr(), pad, selector.0) };
+	}
+
+	fn set_style_shadow_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_shadow_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_shadow_offset_x(self.as_raw_ptr(), x, selector.0) };
+	}
+
+	fn set_style_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_shadow_offset_y(self.as_raw_ptr(), y, selector.0) };
+	}
+
+	fn set_style_shadow_spread(&mut self, spread: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_shadow_spread(self.as_raw_ptr(), spread, selector.0) };
+	}
+
+	fn set_style_shadow_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_shadow_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_shadow_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	fn set_style_image_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_image_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	fn set_style_image_recolor(&mut self, recolor: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_image_recolor(
+				self.as_raw_ptr(),
+				recolor.as_raw(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_image_recolor_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_image_recolor_opa(self.as_raw_ptr(), opa.into(), selector.0)
+		};
+	}
+
+	fn set_style_image_colorkey(&mut self, colorkey: &ImageColorKey, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_image_colorkey(
+				self.as_raw_ptr(),
+				colorkey.as_raw_ptr(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_line_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_line_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_line_dash_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_line_dash_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_line_dash_gap(&mut self, gap: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_line_dash_gap(self.as_raw_ptr(), gap, selector.0) };
+	}
+
+	fn set_style_line_rounded(&mut self, rounded: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_line_rounded(self.as_raw_ptr(), rounded, selector.0) };
+	}
+
+	fn set_style_line_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_line_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_line_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_line_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	fn set_style_arc_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_arc_width(self.as_raw_ptr(), width, selector.0) };
+	}
+
+	fn set_style_arc_rounded(&mut self, rounded: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_arc_rounded(self.as_raw_ptr(), rounded, selector.0) };
+	}
+
+	fn set_style_arc_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_arc_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_arc_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_arc_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	// fn set_style_arc_image_src(&mut self, src: *const (), selector: StyleSelector);
+
+	fn set_style_text_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_color(self.as_raw_ptr(), color.as_raw(), selector.0)
+		};
+	}
+
+	fn set_style_text_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_text_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	// fn set_style_text_font(&mut self, font: &Font, selector: StyleSelector) {
+	// 	unsafe {
+	// 		lvgl_sys::lv_obj_set_style_text_font(self.as_raw_ptr(), font.as_raw_ptr(), selector.0)
+	// 	};
+	// }
+
+	fn set_style_text_letter_space(&mut self, space: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_letter_space(self.as_raw_ptr(), space, selector.0)
+		};
+	}
+
+	fn set_style_text_line_space(&mut self, space: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_text_line_space(self.as_raw_ptr(), space, selector.0) };
+	}
+
+	fn set_style_text_decor(&mut self, decor: TextDecor, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_decor(self.as_raw_ptr(), decor.bits(), selector.0)
+		};
+	}
+
+	fn set_style_text_align(&mut self, align: Align, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_align(self.as_raw_ptr(), align.into(), selector.0)
+		};
+	}
+
+	fn set_style_text_outline_stroke_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_outline_stroke_color(
+				self.as_raw_ptr(),
+				color.as_raw(),
 				selector.0,
 			)
 		};
