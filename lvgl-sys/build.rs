@@ -26,47 +26,94 @@ fn rerun_if_changed_recursive(dir: &Path) {
 	}
 }
 
-fn main() {
-	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-	let workspace_root = manifest_dir.parent().unwrap();
-	let lvgl_root = workspace_root.join("vendor").join("lvgl");
-	let lvgl_src = lvgl_root.join("src");
-	let conf_dir = manifest_dir.join("c");
-
+fn build_lvgl(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path) {
+	// Collect all C source files from the lvgl source directory
 	let mut lvgl_sources = Vec::new();
 	collect_c_files_recursive(&lvgl_src, &mut lvgl_sources);
 	lvgl_sources.sort();
 
+	// Watch recursively for changes to all C source files and headers in the lvgl source directory
 	rerun_if_changed_recursive(&lvgl_src);
+	rerun_if_changed_recursive(&conf_dir);
 
-	println!(
-		"cargo:rerun-if-changed={}",
-		conf_dir.join("lv_conf.h").display()
-	);
+	// Watch for changes to environment variables that affect the build
 	println!("cargo:rerun-if-env-changed=CC");
 	println!("cargo:rerun-if-env-changed=CFLAGS");
 	println!("cargo:rerun-if-env-changed=TARGET");
 
+	// Build the lvgl C library
 	let mut lvgl_build = cc::Build::new();
 	lvgl_build
-		.include(&conf_dir)
 		.include(&lvgl_root)
 		.include(&lvgl_src)
+		.include(&conf_dir)
 		.define("LV_CONF_INCLUDE_SIMPLE", None)
 		.flag_if_supported("-std=c11")
-		.warnings(true);
+		.warnings(false);
+
 	for src in &lvgl_sources {
 		lvgl_build.file(src);
 	}
 	lvgl_build.compile("lvgl");
 
-	println!("cargo:rustc-link-lib=static=lvgl");
-	println!(
-		"cargo:rustc-link-search=native={}/release/build/lvgl-sys-*/out",
-		env::var("OUT_DIR").unwrap().split("/out").next().unwrap()
-	);
-
 	pkg_config::Config::new()
 		.probe("sdl2")
 		.expect("Failed to find SDL2 via pkg-config");
+}
+
+fn build_bindings(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path, shims_dir: &Path) {
+	let mut cc_args = vec![
+		// Definitions
+		"-DLV_CONF_INCLUDE_SIMPLE",
+		// Include paths
+		"-I",
+		lvgl_root.to_str().unwrap(),
+		"-I",
+		lvgl_src.to_str().unwrap(),
+		"-I",
+		conf_dir.to_str().unwrap(),
+		// Compiler flags
+		"-std=c11",
+		// Warnings
+		// "-Wall",
+		// "-Wextra",
+	];
+
+	// Set correct target triple for bindgen when cross-compiling
+	let target = env::var("TARGET").expect("Cargo build scripts always have TARGET");
+	let host = env::var("HOST").expect("Cargo build scripts always have HOST");
+	if target != host {
+		cc_args.push("-target");
+		cc_args.push(target.as_str());
+	}
+
+	let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+	let bindings = bindgen::Builder::default()
+		.header(shims_dir.join("lvgl_sys.h").to_str().unwrap())
+		.generate_comments(true)
+		.derive_default(true)
+		.layout_tests(false)
+		.use_core()
+		.ctypes_prefix("cty")
+		.clang_args(&cc_args)
+		.generate()
+		.expect("Failed to generate bindings");
+
+	// Output to file
+	bindings
+		.write_to_file(out_path.join("bindings.rs"))
+		.expect("Failed to write bindings");
+}
+
+fn main() {
+	// Define our directory structure
+	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+	let workspace_root = manifest_dir.parent().unwrap();
+	let lvgl_root = workspace_root.join("vendor").join("lvgl");
+	let lvgl_src = lvgl_root.join("src");
+	let conf_dir = manifest_dir.join("conf");
+	let shims_dir = manifest_dir.join("shims");
+
+	build_lvgl(&lvgl_root, &lvgl_src, &conf_dir);
+	build_bindings(&lvgl_root, &lvgl_src, &conf_dir, &shims_dir);
 }

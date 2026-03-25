@@ -5,7 +5,7 @@
 int32_t COLUMN_DESC[] = {LV_GRID_CONTENT, LV_GRID_FR(1), 5, LV_GRID_TEMPLATE_LAST};
 const int32_t ROW_DESC[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
 
-char *get_unit_string(MetricUnit unit)
+const char *get_unit_string(MetricUnit unit)
 {
 	switch (unit)
 	{

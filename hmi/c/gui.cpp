@@ -14,7 +14,7 @@
 #endif
 #include <stdio.h>
 
-static lv_display_t *display;
+// static lv_display_t *display;
 
 static struct
 {
@@ -139,23 +139,8 @@ void gui_build_tabs(lv_obj_t *scr)
 
 int gui_init(void)
 {
-	lv_init();
+	// lv_init();
 	styles::init();
-
-#ifdef BACKEND_SDL
-	// Create display
-	display = lv_sdl_window_create(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-	if (!display)
-	{
-		fprintf(stderr, "Failed to create SDL window\n");
-		return -1;
-	}
-
-	// Create input devices
-	lv_sdl_mouse_create();
-#endif
-
-	lv_display_set_default(display);
 
 	gui_build();
 
@@ -165,29 +150,4 @@ int gui_init(void)
 	update_tank_level(TANK_PROPANE, 90);
 
 	return 0;
-}
-
-void gui_tick_inc(uint32_t ms)
-{
-	lv_tick_inc(ms);
-}
-
-void gui_task_handler(void)
-{
-	lv_task_handler();
-}
-
-void gui_apply_snapshot(const UiSnapshot *snapshot)
-{
-	// char buf[32];
-	// snprintf(buf, sizeof(buf), "%d W", snapshot->solar_watts);
-	// lv_label_set_text(label_power, buf);
-
-	// lv_bar_set_value(bar_tank, snapshot->tank_level_pct, LV_ANIM_OFF);
-
-	// if (snapshot->charging) {
-	// 	lv_obj_add_state(btn_reset, LV_STATE_DISABLED);
-	// } else {
-	// 	lv_obj_clear_state(btn_reset, LV_STATE_DISABLED);
-	// }
 }

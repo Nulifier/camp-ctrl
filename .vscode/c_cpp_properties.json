@@ -7,7 +7,7 @@
 				"${workspaceFolder}/hmi/c",
 				"${workspaceFolder}/vendor/lvgl",
 				"${workspaceFolder}/vendor/lvgl/src",
-				"${workspaceFolder}/lvgl-sys/c"
+				"${workspaceFolder}/lvgl-sys/conf"
 			],
 			"defines": [
 				"LV_CONF_INCLUDE_SIMPLE"

@@ -49,7 +49,7 @@ fn main() {
 
 	let workspace_root = manifest_dir.parent().unwrap();
 	let lvgl_root = workspace_root.join("vendor").join("lvgl");
-	let lvgl_conf = workspace_root.join("lvgl-sys").join("c");
+	let lvgl_conf = workspace_root.join("lvgl-sys").join("conf");
 
 	let mut gui_build = cc::Build::new();
 	gui_build
