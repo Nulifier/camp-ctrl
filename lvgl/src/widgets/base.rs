@@ -2,10 +2,13 @@ extern crate alloc;
 
 use super::obj::{AsRawObj, Obj, ObjRef};
 use crate::event::{Event, EventCode, EventHandle};
+use crate::layouts::flex::{FlexAlign, FlexFlow};
+use crate::layouts::grid::GRID_TEMPLATE_LAST;
 use crate::misc::area::{Align, Area, Point};
+use crate::misc::bidi::BaseDir;
 use crate::misc::color::{Color, Opacity};
 use crate::misc::grad::{GradDir, GradientDescriptor};
-use crate::style::{BorderSide, ImageColorKey, Style, TextDecor};
+use crate::style::{BlendMode, BlurQuality, BorderSide, ImageColorKey, Style, TextDecor};
 use bitflags::bitflags;
 use core::ptr::NonNull;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -842,6 +845,326 @@ pub trait Widget: AsRawObj {
 				color.as_raw(),
 				selector.0,
 			)
+		};
+	}
+
+	fn set_style_text_outline_stroke_width(&mut self, width: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_outline_stroke_width(
+				self.as_raw_ptr(),
+				width,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_text_outline_stroke_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_outline_stroke_opa(
+				self.as_raw_ptr(),
+				opa.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_blur_radius(&mut self, radius: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_blur_radius(self.as_raw_ptr(), radius, selector.0) };
+	}
+
+	fn set_style_blur_backdrop(&mut self, blur: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_blur_backdrop(self.as_raw_ptr(), blur, selector.0) };
+	}
+
+	fn set_style_blur_quality(&mut self, quality: BlurQuality, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_blur_quality(self.as_raw_ptr(), quality.into(), selector.0)
+		};
+	}
+
+	fn set_style_drop_shadow_radius(&mut self, radius: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_radius(self.as_raw_ptr(), radius, selector.0)
+		};
+	}
+
+	fn set_style_drop_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_offset_x(self.as_raw_ptr(), x, selector.0)
+		};
+	}
+
+	fn set_style_drop_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_offset_y(self.as_raw_ptr(), y, selector.0)
+		};
+	}
+
+	fn set_style_drop_shadow_color(&mut self, color: Color, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_color(
+				self.as_raw_ptr(),
+				color.as_raw(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_drop_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_opa(self.as_raw_ptr(), opa.into(), selector.0)
+		};
+	}
+
+	fn set_style_drop_shadow_quality(&mut self, quality: BlurQuality, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_drop_shadow_quality(
+				self.as_raw_ptr(),
+				quality.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_radius(&mut self, radius: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_radius(self.as_raw_ptr(), radius, selector.0) };
+	}
+
+	fn set_style_radial_offset(&mut self, offset: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_radial_offset(self.as_raw_ptr(), offset, selector.0) };
+	}
+
+	fn set_style_clip_corner(&mut self, clip: bool, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_clip_corner(self.as_raw_ptr(), clip, selector.0) };
+	}
+
+	fn set_style_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+	}
+
+	fn set_style_opa_layered(&mut self, layered: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_opa_layered(self.as_raw_ptr(), layered.into(), selector.0)
+		};
+	}
+
+	// fn set_style_color_filter_dsc(
+	// 	&mut self,
+	// 	filter: *const (),
+	// 	selector: StyleSelector,
+	// ) {
+	// 	unsafe {
+	// 		lvgl_sys::lv_obj_set_style_color_filter_dsc(
+	// 			self.as_raw_ptr(),
+	// 			filter.as_raw_ptr(),
+	// 			selector.0,
+	// 		)
+	// 	};
+	// }
+
+	fn set_style_color_filter_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_color_filter_opa(self.as_raw_ptr(), opa.into(), selector.0)
+		};
+	}
+
+	// fn set_style_anim(&mut self, anim: &StyleAnim, selector: StyleSelector) {
+	// 	unsafe { lvgl_sys::lv_obj_set_style_anim(self.as_raw_ptr(), anim.as_raw_ptr(), selector.0) };
+	// }
+
+	fn set_style_anim_duration(&mut self, duration: u32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_anim_duration(self.as_raw_ptr(), duration, selector.0)
+		};
+	}
+
+	// fn set_style_transition(&mut self, transition: &StyleTransition, selector: StyleSelector) {
+	// 	unsafe {
+	// 		lvgl_sys::lv_obj_set_style_transition(
+	// 			self.as_raw_ptr(),
+	// 			transition.as_raw_ptr(),
+	// 			selector.0,
+	// 		)
+	// 	};
+	// }
+
+	fn set_style_blend_mode(&mut self, blend: BlendMode, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_blend_mode(self.as_raw_ptr(), blend.into(), selector.0)
+		};
+	}
+
+	fn set_style_layout(&mut self, layout: u32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_layout(self.as_raw_ptr(), layout as u16, selector.0) };
+	}
+
+	fn set_style_base_dir(&mut self, dir: BaseDir, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_base_dir(self.as_raw_ptr(), dir.into(), selector.0) };
+	}
+
+	// fn set_style_bitmap_mask_src(&mut self, src: *const (), selector: StyleSelector) {
+	// 	unsafe {
+	// 		lvgl_sys::lv_obj_set_style_bitmap_mask_src(
+	// 			self.as_raw_ptr(),
+	// 			src as *const _,
+	// 			selector.0,
+	// 		)
+	// 	};
+	// }
+
+	fn set_style_rotary_sensitivity(&mut self, sensitivity: u32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_rotary_sensitivity(
+				self.as_raw_ptr(),
+				sensitivity,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_flex_flow(&mut self, flow: FlexFlow, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_flex_flow(
+				self.as_raw_ptr(),
+				flow as lvgl_sys::lv_flex_flow_t,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_flex_main_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_flex_main_place(
+				self.as_raw_ptr(),
+				place as lvgl_sys::lv_flex_align_t,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_flex_cross_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_flex_cross_place(
+				self.as_raw_ptr(),
+				place as lvgl_sys::lv_flex_align_t,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_flex_track_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_flex_track_place(
+				self.as_raw_ptr(),
+				place as lvgl_sys::lv_flex_align_t,
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_flex_grow(&mut self, grow: u8, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_flex_grow(self.as_raw_ptr(), grow, selector.0) };
+	}
+
+	fn set_style_grid_column_descriptors(&mut self, descriptors: &[i32], selector: StyleSelector) {
+		// Check if the descriptors array ends with GRID_TEMPLATE_LAST, and if not allocate a vec to
+		// hold the descriptors and append GRID_TEMPLATE_LAST.
+		let desc_array = if descriptors.last() == Some(&GRID_TEMPLATE_LAST) {
+			None
+		} else {
+			let mut vec = alloc::vec::Vec::from(descriptors);
+			vec.push(GRID_TEMPLATE_LAST);
+			Some(vec)
+		};
+
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_column_dsc_array(
+				self.as_raw_ptr(),
+				desc_array
+					.as_ref()
+					.map_or(descriptors.as_ptr(), |v| v.as_ptr()),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_grid_column_align(&mut self, align: Align, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_column_align(
+				self.as_raw_ptr(),
+				align.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_grid_row_descriptors(&mut self, descriptors: &[i32], selector: StyleSelector) {
+		// Check if the descriptors array ends with GRID_TEMPLATE_LAST, and if not allocate a vec to
+		// hold the descriptors and append GRID_TEMPLATE_LAST.
+		let desc_array = if descriptors.last() == Some(&GRID_TEMPLATE_LAST) {
+			None
+		} else {
+			let mut vec = alloc::vec::Vec::from(descriptors);
+			vec.push(GRID_TEMPLATE_LAST);
+			Some(vec)
+		};
+
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_row_dsc_array(
+				self.as_raw_ptr(),
+				desc_array
+					.as_ref()
+					.map_or(descriptors.as_ptr(), |v| v.as_ptr()),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_grid_row_align(&mut self, align: Align, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_row_align(self.as_raw_ptr(), align.into(), selector.0)
+		};
+	}
+
+	fn set_style_grid_cell_column_pos(&mut self, column: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_cell_column_pos(self.as_raw_ptr(), column, selector.0)
+		};
+	}
+
+	fn set_style_grid_cell_x_align(&mut self, align: Align, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_cell_x_align(
+				self.as_raw_ptr(),
+				align.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_grid_cell_column_span(&mut self, span: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_cell_column_span(self.as_raw_ptr(), span, selector.0)
+		};
+	}
+
+	fn set_style_grid_cell_row_pos(&mut self, row: i32, selector: StyleSelector) {
+		unsafe { lvgl_sys::lv_obj_set_style_grid_cell_row_pos(self.as_raw_ptr(), row, selector.0) };
+	}
+
+	fn set_style_grid_cell_y_align(&mut self, align: Align, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_cell_y_align(
+				self.as_raw_ptr(),
+				align.into(),
+				selector.0,
+			)
+		};
+	}
+
+	fn set_style_grid_cell_row_span(&mut self, span: i32, selector: StyleSelector) {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_grid_cell_row_span(self.as_raw_ptr(), span, selector.0)
 		};
 	}
 }

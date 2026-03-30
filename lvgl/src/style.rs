@@ -25,6 +25,12 @@ pub enum BlendMode {
 	Difference = lvgl_sys::lv_blend_mode_t_LV_BLEND_MODE_DIFFERENCE,
 }
 
+impl From<BlendMode> for u32 {
+	fn from(mode: BlendMode) -> Self {
+		mode as u32
+	}
+}
+
 bitflags! {
 	pub struct TextDecor: u32 {
 		const NONE = lvgl_sys::lv_text_decor_t_LV_TEXT_DECOR_NONE;
@@ -48,6 +54,12 @@ pub enum BlurQuality {
 	Auto = lvgl_sys::lv_blur_quality_t_LV_BLUR_QUALITY_AUTO,
 	Speed = lvgl_sys::lv_blur_quality_t_LV_BLUR_QUALITY_SPEED,
 	Precision = lvgl_sys::lv_blur_quality_t_LV_BLUR_QUALITY_PRECISION,
+}
+
+impl From<BlurQuality> for u32 {
+	fn from(quality: BlurQuality) -> Self {
+		quality as u32
+	}
 }
 
 pub struct ImageColorKey(lvgl_sys::lv_image_colorkey_t);

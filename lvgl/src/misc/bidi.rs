@@ -6,3 +6,9 @@ pub enum BaseDir {
 	Neutral = lvgl_sys::lv_base_dir_t_LV_BASE_DIR_NEUTRAL,
 	Weak = lvgl_sys::lv_base_dir_t_LV_BASE_DIR_WEAK,
 }
+
+impl From<BaseDir> for u32 {
+	fn from(dir: BaseDir) -> Self {
+		dir as u32
+	}
+}
