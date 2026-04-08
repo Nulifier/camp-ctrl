@@ -5,6 +5,7 @@ use widgets::obj::ObjRef;
 pub mod display;
 pub mod error;
 pub mod event;
+pub mod font;
 pub mod input_device;
 pub mod layouts;
 pub mod misc;
@@ -12,6 +13,14 @@ pub mod style;
 pub mod text;
 pub mod tick;
 pub mod widgets;
+
+pub trait AsRaw<T> {
+	fn as_raw(&self) -> *const T;
+}
+
+pub trait AsRawMut<T> {
+	fn as_raw_mut(&mut self) -> *mut T;
+}
 
 /// Initializes the LVGL library. This should be called once at the start of the program.
 pub fn init() {
@@ -21,7 +30,11 @@ pub fn init() {
 
 pub fn active_screen() -> Option<ObjRef<'static>> {
 	let screen = unsafe { lvgl_sys::lv_screen_active() };
-	widgets::obj::ObjRef::from_raw(screen)
+	if screen.is_null() {
+		None
+	} else {
+		Some(ObjRef::from_raw(screen))
+	}
 }
 
 /// Should be called periodically to allow LVGL to handle timers and other background tasks.

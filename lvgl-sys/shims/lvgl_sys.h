@@ -5,7 +5,7 @@ extern "C"
 {
 #endif
 
-#include <lvgl.h>
+#include "lvgl.h"
 
 #ifdef LV_USE_SDL
 #include "drivers/sdl/lv_sdl_window.h"

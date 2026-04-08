@@ -17,3 +17,9 @@ pub enum TextAlign {
 	Center = lvgl_sys::lv_text_align_t_LV_TEXT_ALIGN_CENTER,
 	Right = lvgl_sys::lv_text_align_t_LV_TEXT_ALIGN_RIGHT,
 }
+
+impl From<TextAlign> for u32 {
+	fn from(align: TextAlign) -> Self {
+		align as u32
+	}
+}

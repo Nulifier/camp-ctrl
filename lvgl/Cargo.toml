@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+num_enum = { version = "0.7.6", default-features = false, features = [] }
 bitflags = "2.11.0"
 lvgl-sys = { version = "0.1.0", path = "../lvgl-sys" }
-num_enum = "0.7.6"
 
 [features]
+default = []
 sdl = ["lvgl-sys/sdl"]

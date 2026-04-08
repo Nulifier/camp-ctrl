@@ -4,7 +4,6 @@
 	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
-		
 		{
 			"name": "Debug unit tests in library 'hmi'",
 			"type": "lldb",
@@ -51,6 +50,38 @@
 					"--package=ve-direct"
 				]
 			}
+		},
+		{
+			"preLaunchTask": "rust: cargo build hmi",
+			"type": "probe-rs-debug",
+			"request": "launch",
+			"name": "hmi",
+			"cwd": "${workspaceFolder}/hmi",
+			"chip": "rp235x",
+			// TODO: Does RP235x support connectUnderReset?
+			"connectUnderReset": false,
+			"speed": 4000,
+			"runtimeExecutable": "probe-rs",
+			"runtimeArgs": [
+				"dap-server"
+			],
+			"flashingConfig": {
+				"flashingEnabled": true,
+				"haltAfterReset": false
+			},
+			"coreConfigs": [
+				{
+					"coreIndex": 0,
+					"programBinary": "${workspaceFolder}/target/thumbv8m.main-none-eabihf/debug/hmi",
+					"rttEnabled": true,
+					// Uncomment this if you've downloaded the SVD from
+					// https://github.com/raspberrypi/pico-sdk/raw/2.2.0/src/rp2350/hardware_regs/RP2350.svd
+					// and placed it in the .vscode directory
+					"svdFile": "./.vscode/rp235x.svd",
+				}
+			],
+			"consoleLogLevel": "Info", //Error, Warn, Info, Debug, Trace
+			"wireProtocol": "Swd"
 		}
 	]
 }

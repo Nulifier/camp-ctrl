@@ -1,0 +1,8 @@
+[package]
+name = "hmi-sim"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lvgl = { version = "0.1.0", path = "../lvgl", features = ["sdl"] }
+hmi-gui = { path = "../hmi-gui" }

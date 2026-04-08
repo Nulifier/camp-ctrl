@@ -16,12 +16,10 @@ pub struct Event<'a> {
 impl<'a> Event<'a> {
 	pub fn target_obj(&self) -> ObjRef<'a> {
 		ObjRef::from_raw(unsafe { lvgl_sys::lv_event_get_target_obj(self.raw) })
-			.expect("Received null event target from LVGL")
 	}
 
 	pub fn current_target_obj(&self) -> ObjRef<'a> {
 		ObjRef::from_raw(unsafe { lvgl_sys::lv_event_get_current_target_obj(self.raw) })
-			.expect("Received null event current target from LVGL")
 	}
 
 	pub fn code(&self) -> EventCode {
@@ -92,7 +90,7 @@ impl<'a> Event<'a> {
 	}
 }
 
-#[derive(Copy, Clone, IntoPrimitive, TryFromPrimitive)]
+#[derive(Copy, Clone, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
 pub enum EventCode {
 	All = lvgl_sys::lv_event_code_t_LV_EVENT_ALL,

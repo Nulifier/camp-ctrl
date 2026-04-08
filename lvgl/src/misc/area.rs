@@ -231,6 +231,8 @@ impl Default for Area {
 	}
 }
 
+pub const SIZE_CONTENT: i32 = 0x3FFF_FFFF;
+
 /// Converts a percentage value (0-1000) to the internal representation used by LVGL.
 pub fn as_percent(value: i32) -> i32 {
 	unsafe { lvgl_sys::lv_pct(value) }

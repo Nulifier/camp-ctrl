@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod hex;
 pub mod parser;
 pub mod register;

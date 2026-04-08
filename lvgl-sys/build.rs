@@ -26,7 +26,7 @@ fn rerun_if_changed_recursive(dir: &Path) {
 	}
 }
 
-fn build_lvgl(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path) {
+fn build_lvgl(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path, use_sdl: bool) {
 	// Collect all C source files from the lvgl source directory
 	let mut lvgl_sources = Vec::new();
 	collect_c_files_recursive(&lvgl_src, &mut lvgl_sources);
@@ -40,6 +40,7 @@ fn build_lvgl(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path) {
 	println!("cargo:rerun-if-env-changed=CC");
 	println!("cargo:rerun-if-env-changed=CFLAGS");
 	println!("cargo:rerun-if-env-changed=TARGET");
+	println!("cargo:rerun-if-env-changed=CARGO_FEATURE_SDL");
 
 	// Build the lvgl C library
 	let mut lvgl_build = cc::Build::new();
@@ -51,40 +52,52 @@ fn build_lvgl(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path) {
 		.flag_if_supported("-std=c11")
 		.warnings(false);
 
+	if use_sdl {
+		lvgl_build.define("LV_USE_SDL", Some("1"));
+	}
+
 	for src in &lvgl_sources {
 		lvgl_build.file(src);
 	}
 	lvgl_build.compile("lvgl");
 
-	pkg_config::Config::new()
-		.probe("sdl2")
-		.expect("Failed to find SDL2 via pkg-config");
+	if use_sdl {
+		pkg_config::Config::new()
+			.probe("sdl2")
+			.expect("Failed to find SDL2 via pkg-config");
+	}
 }
 
-fn build_bindings(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path, shims_dir: &Path) {
+fn build_bindings(
+	lvgl_root: &Path,
+	lvgl_src: &Path,
+	conf_dir: &Path,
+	shims_dir: &Path,
+	use_sdl: bool,
+) {
 	let mut cc_args = vec![
-		// Definitions
 		"-DLV_CONF_INCLUDE_SIMPLE",
-		// Include paths
 		"-I",
 		lvgl_root.to_str().unwrap(),
 		"-I",
 		lvgl_src.to_str().unwrap(),
 		"-I",
 		conf_dir.to_str().unwrap(),
-		// Compiler flags
 		"-std=c11",
-		// Warnings
-		// "-Wall",
-		// "-Wextra",
 	];
+
+	if use_sdl {
+		cc_args.push("-DLV_USE_SDL=1");
+	}
 
 	// Set correct target triple for bindgen when cross-compiling
 	let target = env::var("TARGET").expect("Cargo build scripts always have TARGET");
 	let host = env::var("HOST").expect("Cargo build scripts always have HOST");
 	if target != host {
-		cc_args.push("-target");
-		cc_args.push(target.as_str());
+		cc_args.push("--target=arm-none-eabi");
+		cc_args.push("--sysroot=/usr/arm-none-eabi");
+		// cc_args.push("--gcc-toolchain=/usr");
+		cc_args.push("-I/usr/arm-none-eabi/include");
 	}
 
 	let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -106,6 +119,17 @@ fn build_bindings(lvgl_root: &Path, lvgl_src: &Path, conf_dir: &Path, shims_dir:
 }
 
 fn main() {
+	let target = env::var("TARGET").expect("Cargo build scripts always have TARGET");
+	let sdl_feature_enabled = env::var_os("CARGO_FEATURE_SDL").is_some();
+	let is_linux_target = target.contains("linux");
+	let use_sdl = sdl_feature_enabled && is_linux_target;
+
+	if sdl_feature_enabled && !is_linux_target {
+		println!(
+			"cargo:warning=Feature 'sdl' is enabled, but target '{target}' is not Linux; SDL integration is disabled"
+		);
+	}
+
 	// Define our directory structure
 	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 	let workspace_root = manifest_dir.parent().unwrap();
@@ -114,6 +138,6 @@ fn main() {
 	let conf_dir = manifest_dir.join("conf");
 	let shims_dir = manifest_dir.join("shims");
 
-	build_lvgl(&lvgl_root, &lvgl_src, &conf_dir);
-	build_bindings(&lvgl_root, &lvgl_src, &conf_dir, &shims_dir);
+	build_lvgl(&lvgl_root, &lvgl_src, &conf_dir, use_sdl);
+	build_bindings(&lvgl_root, &lvgl_src, &conf_dir, &shims_dir, use_sdl);
 }

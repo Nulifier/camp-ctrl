@@ -1,7 +1,7 @@
 pub struct Opacity(u8);
 
 impl Opacity {
-	pub const fn from_u32(value: u32) -> Self {
+	pub(crate) const fn from_u32(value: u32) -> Self {
 		Self(value as u8)
 	}
 }
@@ -40,15 +40,19 @@ impl Color {
 	// 	&mut self.0
 	// }
 
-	pub fn red(&self) -> u8 {
+	pub const fn from_rgb8(red: u8, green: u8, blue: u8) -> Self {
+		Self(lvgl_sys::lv_color_t { red, green, blue })
+	}
+
+	pub const fn red(&self) -> u8 {
 		self.0.red
 	}
 
-	pub fn green(&self) -> u8 {
+	pub const fn green(&self) -> u8 {
 		self.0.green
 	}
 
-	pub fn blue(&self) -> u8 {
+	pub const fn blue(&self) -> u8 {
 		self.0.blue
 	}
 

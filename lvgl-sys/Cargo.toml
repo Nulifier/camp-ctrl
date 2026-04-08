@@ -12,4 +12,5 @@ bindgen = "0.72.1"
 cty = "0.2.2"
 
 [features]
+default = []
 sdl = []

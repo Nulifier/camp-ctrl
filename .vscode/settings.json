@@ -1,0 +1,15 @@
+{
+	// "rust-analyzer.cargo.target": "thumbv8m.main-none-eabihf",
+	"rust-analyzer.linkedProjects": [
+		"${workspaceFolder}/hmi/Cargo.toml",
+		"${workspaceFolder}/hmi-gui/Cargo.toml",
+		"${workspaceFolder}/hmi-sim/Cargo.toml",
+		"${workspaceFolder}/lvgl/Cargo.toml",
+		"${workspaceFolder}/lvgl-sys/Cargo.toml",
+		"${workspaceFolder}/ve-direct/Cargo.toml"
+	],
+	"rust-analyzer.cargo.features": [],
+	"rust-analyzer.cargo.allTargets": false,
+	"rust-analyzer.cargo.noDefaultFeatures": false,
+	"editor.formatOnSave": true
+}

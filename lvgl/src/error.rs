@@ -6,6 +6,7 @@ pub enum Error {
 	DisplayCreateFailed,
 	InputDeviceCreateFailed,
 	IndexOutOfBounds,
+	InvalidGridDescriptors,
 }
 
 impl core::fmt::Display for Error {
@@ -15,6 +16,7 @@ impl core::fmt::Display for Error {
 			Self::DisplayCreateFailed => write!(f, "failed to create display"),
 			Self::InputDeviceCreateFailed => write!(f, "failed to create input device"),
 			Self::IndexOutOfBounds => write!(f, "index out of bounds"),
+			Self::InvalidGridDescriptors => write!(f, "invalid grid descriptors"),
 		}
 	}
 }

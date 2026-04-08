@@ -1,13 +1,16 @@
 extern crate alloc;
 
 use super::obj::{AsRawObj, Obj, ObjRef};
+use crate::error::{Error, Result};
 use crate::event::{Event, EventCode, EventHandle};
+use crate::font::Font;
 use crate::layouts::flex::{FlexAlign, FlexFlow};
-use crate::layouts::grid::GRID_TEMPLATE_LAST;
+use crate::layouts::grid::{GRID_TEMPLATE_LAST, GridAlign};
 use crate::misc::area::{Align, Area, Point};
 use crate::misc::bidi::BaseDir;
 use crate::misc::color::{Color, Opacity};
 use crate::misc::grad::{GradDir, GradientDescriptor};
+use crate::misc::text::TextAlign;
 use crate::style::{BlendMode, BlurQuality, BorderSide, ImageColorKey, Style, TextDecor};
 use bitflags::bitflags;
 use core::ptr::NonNull;
@@ -123,7 +126,7 @@ impl From<State> for StyleSelector {
 	}
 }
 
-pub trait Widget: AsRawObj {
+pub trait Widget<'a>: AsRawObj {
 	fn has_flag(&self, flag: ObjFlags) -> bool {
 		unsafe { lvgl_sys::lv_obj_has_flag(self.as_raw_ptr(), flag.bits()) }
 	}
@@ -132,16 +135,19 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_has_flag_any(self.as_raw_ptr(), flag.bits()) }
 	}
 
-	fn add_flag(&mut self, flag: ObjFlags) {
+	fn add_flag(&mut self, flag: ObjFlags) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_add_flag(self.as_raw_ptr(), flag.bits()) };
+		self
 	}
 
-	fn remove_flag(&mut self, flag: ObjFlags) {
+	fn remove_flag(&mut self, flag: ObjFlags) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_remove_flag(self.as_raw_ptr(), flag.bits()) };
+		self
 	}
 
-	fn set_flag(&mut self, flag: ObjFlags, enabled: bool) {
+	fn set_flag(&mut self, flag: ObjFlags, enabled: bool) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_flag(self.as_raw_ptr(), flag.bits(), enabled) };
+		self
 	}
 
 	fn get_state(&self) -> State {
@@ -152,16 +158,19 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_has_state(self.as_raw_ptr(), state.bits()) }
 	}
 
-	fn add_state(&mut self, state: State) {
+	fn add_state(&mut self, state: State) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_add_state(self.as_raw_ptr(), state.bits()) };
+		self
 	}
 
-	fn remove_state(&mut self, state: State) {
+	fn remove_state(&mut self, state: State) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_remove_state(self.as_raw_ptr(), state.bits()) };
+		self
 	}
 
-	fn set_state(&mut self, state: State, enabled: bool) {
+	fn set_state(&mut self, state: State, enabled: bool) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_state(self.as_raw_ptr(), state.bits(), enabled) };
+		self
 	}
 
 	fn is_radio_button(&self) -> bool {
@@ -180,20 +189,24 @@ pub trait Widget: AsRawObj {
 		handle.remove();
 	}
 
-	fn set_pos(&mut self, x: i32, y: i32) {
+	fn set_pos(&mut self, x: i32, y: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_pos(self.as_raw_ptr(), x, y) };
+		self
 	}
 
-	fn set_x(&mut self, x: i32) {
+	fn set_x(&mut self, x: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_x(self.as_raw_ptr(), x) };
+		self
 	}
 
-	fn set_y(&mut self, y: i32) {
+	fn set_y(&mut self, y: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_y(self.as_raw_ptr(), y) };
+		self
 	}
 
-	fn set_size(&mut self, width: i32, height: i32) {
+	fn set_size(&mut self, width: i32, height: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_size(self.as_raw_ptr(), width, height) };
+		self
 	}
 
 	/// Reclaculate the size of the object.
@@ -202,26 +215,31 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_refr_size(self.as_raw_ptr()) }
 	}
 
-	fn set_width(&mut self, width: i32) {
+	fn set_width(&mut self, width: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_width(self.as_raw_ptr(), width) };
+		self
 	}
 
-	fn set_height(&mut self, height: i32) {
+	fn set_height(&mut self, height: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_height(self.as_raw_ptr(), height) };
+		self
 	}
 
-	fn set_content_width(&mut self, width: i32) {
+	fn set_content_width(&mut self, width: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_content_width(self.as_raw_ptr(), width) };
+		self
 	}
 
-	fn set_content_height(&mut self, height: i32) {
+	fn set_content_height(&mut self, height: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_content_height(self.as_raw_ptr(), height) };
+		self
 	}
 
 	/// Sets the layout of the object's children.
 	/// See LAYOUT_FLEX and LAYOUT_GRID for common layouts.
-	fn set_layout(&mut self, layout: u32) {
+	fn set_layout(&mut self, layout: u32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_layout(self.as_raw_ptr(), layout.into()) };
+		self
 	}
 
 	fn is_layout_positioned(&self) -> bool {
@@ -236,15 +254,23 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_update_layout(self.as_raw_ptr()) };
 	}
 
-	fn set_align(&mut self, align: Align) {
+	fn set_align(&mut self, align: Align) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_align(self.as_raw_ptr(), align.into()) };
+		self
 	}
 
-	fn align(&mut self, align: Align, x_offset: i32, y_offset: i32) {
+	fn align(&mut self, align: Align, x_offset: i32, y_offset: i32) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_align(self.as_raw_ptr(), align.into(), x_offset, y_offset) };
+		self
 	}
 
-	fn align_to(&mut self, base: &impl AsRawObj, align: Align, x_offset: i32, y_offset: i32) {
+	fn align_to(
+		&mut self,
+		base: &impl AsRawObj,
+		align: Align,
+		x_offset: i32,
+		y_offset: i32,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_align_to(
 				self.as_raw_ptr(),
@@ -254,10 +280,12 @@ pub trait Widget: AsRawObj {
 				y_offset,
 			)
 		};
+		self
 	}
 
-	fn center(&mut self) {
+	fn center(&mut self) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_center(self.as_raw_ptr()) };
+		self
 	}
 
 	// fn set_transform(&mut self, matrix: Matrix);
@@ -395,12 +423,14 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_remove_style(self.as_raw_ptr(), style.as_raw_ptr(), selector.0) };
 	}
 
-	fn remove_theme(&mut self, selector: StyleSelector) {
+	fn remove_theme(&mut self, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_remove_theme(self.as_raw_ptr(), selector.0) };
+		self
 	}
 
-	fn remove_style_all(&mut self) {
+	fn remove_style_all(&mut self) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_remove_style_all(self.as_raw_ptr()) };
+		self
 	}
 
 	fn style_set_disabled(&mut self, style: &Style, selector: StyleSelector, disabled: bool) {
@@ -428,165 +458,205 @@ pub trait Widget: AsRawObj {
 		unsafe { lvgl_sys::lv_obj_fade_out(self.as_raw_ptr(), time, delay) };
 	}
 
-	fn set_style_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_min_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_min_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_min_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_max_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_max_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_max_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_height(&mut self, height: i32, selector: StyleSelector) {
+	fn set_style_height(&mut self, height: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_height(self.as_raw_ptr(), height, selector.0) };
+		self
 	}
 
-	fn set_style_min_height(&mut self, height: i32, selector: StyleSelector) {
+	fn set_style_min_height(&mut self, height: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_min_height(self.as_raw_ptr(), height, selector.0) };
+		self
 	}
 
-	fn set_style_max_height(&mut self, height: i32, selector: StyleSelector) {
+	fn set_style_max_height(&mut self, height: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_max_height(self.as_raw_ptr(), height, selector.0) };
+		self
 	}
 
-	fn set_style_length(&mut self, length: i32, selector: StyleSelector) {
+	fn set_style_length(&mut self, length: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_length(self.as_raw_ptr(), length, selector.0) };
+		self
 	}
 
-	fn set_style_x(&mut self, x: i32, selector: StyleSelector) {
+	fn set_style_x(&mut self, x: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_x(self.as_raw_ptr(), x, selector.0) };
+		self
 	}
 
-	fn set_style_y(&mut self, y: i32, selector: StyleSelector) {
+	fn set_style_y(&mut self, y: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_y(self.as_raw_ptr(), y, selector.0) };
+		self
 	}
 
-	fn set_style_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_align(&mut self, align: Align, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_align(self.as_raw_ptr(), align.into(), selector.0) };
+		self
 	}
 
-	fn set_style_transform_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_transform_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_transform_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_transform_height(&mut self, height: i32, selector: StyleSelector) {
+	fn set_style_transform_height(&mut self, height: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_transform_height(self.as_raw_ptr(), height, selector.0)
 		};
+		self
 	}
 
-	fn set_style_translate_x(&mut self, x: i32, selector: StyleSelector) {
+	fn set_style_translate_x(&mut self, x: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_translate_x(self.as_raw_ptr(), x, selector.0) };
+		self
 	}
 
-	fn set_style_translate_y(&mut self, y: i32, selector: StyleSelector) {
+	fn set_style_translate_y(&mut self, y: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_translate_y(self.as_raw_ptr(), y, selector.0) };
+		self
 	}
 
-	fn set_style_translate_radial(&mut self, value: i32, selector: StyleSelector) {
+	fn set_style_translate_radial(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_translate_radial(self.as_raw_ptr(), value, selector.0)
 		};
+		self
 	}
 
-	fn set_style_transform_scale_x(&mut self, scale: i32, selector: StyleSelector) {
+	fn set_style_transform_scale_x(&mut self, scale: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_transform_scale_x(self.as_raw_ptr(), scale, selector.0)
 		};
+		self
 	}
 
-	fn set_style_transform_scale_y(&mut self, scale: i32, selector: StyleSelector) {
+	fn set_style_transform_scale_y(&mut self, scale: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_transform_scale_y(self.as_raw_ptr(), scale, selector.0)
 		};
+		self
 	}
 
-	fn set_style_transform_rotation(&mut self, rotation: i32, selector: StyleSelector) {
+	fn set_style_transform_rotation(
+		&mut self,
+		rotation: i32,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_transform_rotation(self.as_raw_ptr(), rotation, selector.0)
 		};
+		self
 	}
 
-	fn set_style_transform_pivot_x(&mut self, x: i32, selector: StyleSelector) {
+	fn set_style_transform_pivot_x(&mut self, x: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_transform_pivot_x(self.as_raw_ptr(), x, selector.0) };
+		self
 	}
 
-	fn set_style_transform_pivot_y(&mut self, y: i32, selector: StyleSelector) {
+	fn set_style_transform_pivot_y(&mut self, y: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_transform_pivot_y(self.as_raw_ptr(), y, selector.0) };
+		self
 	}
 
-	fn set_style_transform_skew_x(&mut self, skew: i32, selector: StyleSelector) {
+	fn set_style_transform_skew_x(&mut self, skew: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_transform_skew_x(self.as_raw_ptr(), skew, selector.0) };
+		self
 	}
 
-	fn set_style_transform_skew_y(&mut self, skew: i32, selector: StyleSelector) {
+	fn set_style_transform_skew_y(&mut self, skew: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_transform_skew_y(self.as_raw_ptr(), skew, selector.0) };
+		self
 	}
 
-	fn set_style_pad_top(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_top(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_top(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_bottom(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_bottom(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_bottom(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_left(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_left(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_left(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_right(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_right(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_right(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_row(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_row(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_row(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_column(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_column(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_column(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_pad_radial(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_pad_radial(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_pad_radial(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_margin_top(&mut self, margin: i32, selector: StyleSelector) {
+	fn set_style_margin_top(&mut self, margin: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_margin_top(self.as_raw_ptr(), margin, selector.0) };
+		self
 	}
 
-	fn set_style_margin_bottom(&mut self, margin: i32, selector: StyleSelector) {
+	fn set_style_margin_bottom(&mut self, margin: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_margin_bottom(self.as_raw_ptr(), margin, selector.0) };
+		self
 	}
 
-	fn set_style_margin_left(&mut self, margin: i32, selector: StyleSelector) {
+	fn set_style_margin_left(&mut self, margin: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_margin_left(self.as_raw_ptr(), margin, selector.0) };
+		self
 	}
 
-	fn set_style_margin_right(&mut self, margin: i32, selector: StyleSelector) {
+	fn set_style_margin_right(&mut self, margin: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_margin_right(self.as_raw_ptr(), margin, selector.0) };
+		self
 	}
 
-	fn set_style_bg_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_bg_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_bg_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_bg_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_bg_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_bg_grad_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_bg_grad_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_grad_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_bg_grad_dir(&mut self, dir: GradDir, selector: StyleSelector) {
+	fn set_style_bg_grad_dir(&mut self, dir: GradDir, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_grad_dir(
 				self.as_raw_ptr(),
@@ -594,43 +664,54 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_bg_main_stop(&mut self, stop: i32, selector: StyleSelector) {
+	fn set_style_bg_main_stop(&mut self, stop: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_bg_main_stop(self.as_raw_ptr(), stop, selector.0) };
+		self
 	}
 
-	fn set_style_bg_grad_stop(&mut self, stop: i32, selector: StyleSelector) {
+	fn set_style_bg_grad_stop(&mut self, stop: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_bg_grad_stop(self.as_raw_ptr(), stop, selector.0) };
+		self
 	}
 
-	fn set_style_bg_main_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_bg_main_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_main_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_bg_grad_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_bg_grad_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_grad_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_bg_grad(&mut self, grad: &GradientDescriptor, selector: StyleSelector) {
+	fn set_style_bg_grad(
+		&mut self,
+		grad: &GradientDescriptor,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_grad(self.as_raw_ptr(), grad.as_raw_ptr(), selector.0)
-		}
+		};
+		self
 	}
 
 	// fn set_style_bg_image_src(&mut self, src: *const (), selector: StyleSelector);
 
-	fn set_style_bg_image_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_bg_image_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_image_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_bg_image_recolor(&mut self, recolor: Color, selector: StyleSelector) {
+	fn set_style_bg_image_recolor(&mut self, recolor: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_image_recolor(
 				self.as_raw_ptr(),
@@ -638,9 +719,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_bg_image_recolor_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_bg_image_recolor_opa(
+		&mut self,
+		opa: Opacity,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_bg_image_recolor_opa(
 				self.as_raw_ptr(),
@@ -648,87 +734,105 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_bg_image_tiled(&mut self, tiled: bool, selector: StyleSelector) {
+	fn set_style_bg_image_tiled(&mut self, tiled: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_bg_image_tiled(self.as_raw_ptr(), tiled, selector.0) };
+		self
 	}
 
-	fn set_style_border_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_border_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_border_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_border_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_border_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_border_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_border_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_border_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_border_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_border_side(&mut self, side: BorderSide, selector: StyleSelector) {
+	fn set_style_border_side(&mut self, side: BorderSide, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_border_side(self.as_raw_ptr(), side.bits(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_border_post(&mut self, post: bool, selector: StyleSelector) {
+	fn set_style_border_post(&mut self, post: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_border_post(self.as_raw_ptr(), post, selector.0) };
+		self
 	}
 
-	fn set_style_outline_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_outline_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_outline_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_outline_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_outline_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_outline_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_outline_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_outline_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_outline_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_outline_pad(&mut self, pad: i32, selector: StyleSelector) {
+	fn set_style_outline_pad(&mut self, pad: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_outline_pad(self.as_raw_ptr(), pad, selector.0) };
+		self
 	}
 
-	fn set_style_shadow_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_shadow_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_shadow_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) {
+	fn set_style_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_shadow_offset_x(self.as_raw_ptr(), x, selector.0) };
+		self
 	}
 
-	fn set_style_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) {
+	fn set_style_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_shadow_offset_y(self.as_raw_ptr(), y, selector.0) };
+		self
 	}
 
-	fn set_style_shadow_spread(&mut self, spread: i32, selector: StyleSelector) {
+	fn set_style_shadow_spread(&mut self, spread: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_shadow_spread(self.as_raw_ptr(), spread, selector.0) };
+		self
 	}
 
-	fn set_style_shadow_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_shadow_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_shadow_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_shadow_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_image_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_image_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_image_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_image_recolor(&mut self, recolor: Color, selector: StyleSelector) {
+	fn set_style_image_recolor(&mut self, recolor: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_image_recolor(
 				self.as_raw_ptr(),
@@ -736,15 +840,21 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_image_recolor_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_image_recolor_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_image_recolor_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_image_colorkey(&mut self, colorkey: &ImageColorKey, selector: StyleSelector) {
+	fn set_style_image_colorkey(
+		&mut self,
+		colorkey: &ImageColorKey,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_image_colorkey(
 				self.as_raw_ptr(),
@@ -752,93 +862,115 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_line_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_line_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_line_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_line_dash_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_line_dash_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_line_dash_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_line_dash_gap(&mut self, gap: i32, selector: StyleSelector) {
+	fn set_style_line_dash_gap(&mut self, gap: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_line_dash_gap(self.as_raw_ptr(), gap, selector.0) };
+		self
 	}
 
-	fn set_style_line_rounded(&mut self, rounded: bool, selector: StyleSelector) {
+	fn set_style_line_rounded(&mut self, rounded: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_line_rounded(self.as_raw_ptr(), rounded, selector.0) };
+		self
 	}
 
-	fn set_style_line_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_line_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_line_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_line_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_line_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_line_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_arc_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_arc_width(&mut self, width: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_arc_width(self.as_raw_ptr(), width, selector.0) };
+		self
 	}
 
-	fn set_style_arc_rounded(&mut self, rounded: bool, selector: StyleSelector) {
+	fn set_style_arc_rounded(&mut self, rounded: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_arc_rounded(self.as_raw_ptr(), rounded, selector.0) };
+		self
 	}
 
-	fn set_style_arc_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_arc_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_arc_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_arc_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_arc_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_arc_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
 	// fn set_style_arc_image_src(&mut self, src: *const (), selector: StyleSelector);
 
-	fn set_style_text_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_text_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_color(self.as_raw_ptr(), color.as_raw(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_text_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_text_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_text_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	// fn set_style_text_font(&mut self, font: &Font, selector: StyleSelector) {
-	// 	unsafe {
-	// 		lvgl_sys::lv_obj_set_style_text_font(self.as_raw_ptr(), font.as_raw_ptr(), selector.0)
-	// 	};
-	// }
+	fn set_style_text_font(&mut self, font: &impl Font, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_text_font(self.as_raw_ptr(), font.as_raw(), selector.0)
+		};
+		self
+	}
 
-	fn set_style_text_letter_space(&mut self, space: i32, selector: StyleSelector) {
+	fn set_style_text_letter_space(&mut self, space: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_letter_space(self.as_raw_ptr(), space, selector.0)
 		};
+		self
 	}
 
-	fn set_style_text_line_space(&mut self, space: i32, selector: StyleSelector) {
+	fn set_style_text_line_space(&mut self, space: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_text_line_space(self.as_raw_ptr(), space, selector.0) };
+		self
 	}
 
-	fn set_style_text_decor(&mut self, decor: TextDecor, selector: StyleSelector) {
+	fn set_style_text_decor(&mut self, decor: TextDecor, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_decor(self.as_raw_ptr(), decor.bits(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_text_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_text_align(&mut self, align: TextAlign, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_align(self.as_raw_ptr(), align.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_text_outline_stroke_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_text_outline_stroke_color(
+		&mut self,
+		color: Color,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_outline_stroke_color(
 				self.as_raw_ptr(),
@@ -846,9 +978,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_text_outline_stroke_width(&mut self, width: i32, selector: StyleSelector) {
+	fn set_style_text_outline_stroke_width(
+		&mut self,
+		width: i32,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_outline_stroke_width(
 				self.as_raw_ptr(),
@@ -856,9 +993,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_text_outline_stroke_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_text_outline_stroke_opa(
+		&mut self,
+		opa: Opacity,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_text_outline_stroke_opa(
 				self.as_raw_ptr(),
@@ -866,41 +1008,52 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_blur_radius(&mut self, radius: i32, selector: StyleSelector) {
+	fn set_style_blur_radius(&mut self, radius: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_blur_radius(self.as_raw_ptr(), radius, selector.0) };
+		self
 	}
 
-	fn set_style_blur_backdrop(&mut self, blur: bool, selector: StyleSelector) {
+	fn set_style_blur_backdrop(&mut self, blur: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_blur_backdrop(self.as_raw_ptr(), blur, selector.0) };
+		self
 	}
 
-	fn set_style_blur_quality(&mut self, quality: BlurQuality, selector: StyleSelector) {
+	fn set_style_blur_quality(
+		&mut self,
+		quality: BlurQuality,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_blur_quality(self.as_raw_ptr(), quality.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_radius(&mut self, radius: i32, selector: StyleSelector) {
+	fn set_style_drop_shadow_radius(&mut self, radius: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_radius(self.as_raw_ptr(), radius, selector.0)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) {
+	fn set_style_drop_shadow_offset_x(&mut self, x: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_offset_x(self.as_raw_ptr(), x, selector.0)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) {
+	fn set_style_drop_shadow_offset_y(&mut self, y: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_offset_y(self.as_raw_ptr(), y, selector.0)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_color(&mut self, color: Color, selector: StyleSelector) {
+	fn set_style_drop_shadow_color(&mut self, color: Color, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_color(
 				self.as_raw_ptr(),
@@ -908,15 +1061,21 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_drop_shadow_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_drop_shadow_quality(&mut self, quality: BlurQuality, selector: StyleSelector) {
+	fn set_style_drop_shadow_quality(
+		&mut self,
+		quality: BlurQuality,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_drop_shadow_quality(
 				self.as_raw_ptr(),
@@ -924,28 +1083,34 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_radius(&mut self, radius: i32, selector: StyleSelector) {
+	fn set_style_radius(&mut self, radius: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_radius(self.as_raw_ptr(), radius, selector.0) };
+		self
 	}
 
-	fn set_style_radial_offset(&mut self, offset: i32, selector: StyleSelector) {
+	fn set_style_radial_offset(&mut self, offset: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_radial_offset(self.as_raw_ptr(), offset, selector.0) };
+		self
 	}
 
-	fn set_style_clip_corner(&mut self, clip: bool, selector: StyleSelector) {
+	fn set_style_clip_corner(&mut self, clip: bool, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_clip_corner(self.as_raw_ptr(), clip, selector.0) };
+		self
 	}
 
-	fn set_style_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_opa(self.as_raw_ptr(), opa.into(), selector.0) };
+		self
 	}
 
-	fn set_style_opa_layered(&mut self, layered: Opacity, selector: StyleSelector) {
+	fn set_style_opa_layered(&mut self, layered: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_opa_layered(self.as_raw_ptr(), layered.into(), selector.0)
 		};
+		self
 	}
 
 	// fn set_style_color_filter_dsc(
@@ -962,20 +1127,22 @@ pub trait Widget: AsRawObj {
 	// 	};
 	// }
 
-	fn set_style_color_filter_opa(&mut self, opa: Opacity, selector: StyleSelector) {
+	fn set_style_color_filter_opa(&mut self, opa: Opacity, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_color_filter_opa(self.as_raw_ptr(), opa.into(), selector.0)
 		};
+		self
 	}
 
 	// fn set_style_anim(&mut self, anim: &StyleAnim, selector: StyleSelector) {
 	// 	unsafe { lvgl_sys::lv_obj_set_style_anim(self.as_raw_ptr(), anim.as_raw_ptr(), selector.0) };
 	// }
 
-	fn set_style_anim_duration(&mut self, duration: u32, selector: StyleSelector) {
+	fn set_style_anim_duration(&mut self, duration: u32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_anim_duration(self.as_raw_ptr(), duration, selector.0)
 		};
+		self
 	}
 
 	// fn set_style_transition(&mut self, transition: &StyleTransition, selector: StyleSelector) {
@@ -988,18 +1155,21 @@ pub trait Widget: AsRawObj {
 	// 	};
 	// }
 
-	fn set_style_blend_mode(&mut self, blend: BlendMode, selector: StyleSelector) {
+	fn set_style_blend_mode(&mut self, blend: BlendMode, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_blend_mode(self.as_raw_ptr(), blend.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_layout(&mut self, layout: u32, selector: StyleSelector) {
+	fn set_style_layout(&mut self, layout: u32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_layout(self.as_raw_ptr(), layout as u16, selector.0) };
+		self
 	}
 
-	fn set_style_base_dir(&mut self, dir: BaseDir, selector: StyleSelector) {
+	fn set_style_base_dir(&mut self, dir: BaseDir, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_base_dir(self.as_raw_ptr(), dir.into(), selector.0) };
+		self
 	}
 
 	// fn set_style_bitmap_mask_src(&mut self, src: *const (), selector: StyleSelector) {
@@ -1012,7 +1182,11 @@ pub trait Widget: AsRawObj {
 	// 	};
 	// }
 
-	fn set_style_rotary_sensitivity(&mut self, sensitivity: u32, selector: StyleSelector) {
+	fn set_style_rotary_sensitivity(
+		&mut self,
+		sensitivity: u32,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_rotary_sensitivity(
 				self.as_raw_ptr(),
@@ -1020,9 +1194,10 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_flex_flow(&mut self, flow: FlexFlow, selector: StyleSelector) {
+	fn set_style_flex_flow(&mut self, flow: FlexFlow, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_flex_flow(
 				self.as_raw_ptr(),
@@ -1030,9 +1205,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_flex_main_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+	fn set_style_flex_main_place(
+		&mut self,
+		place: FlexAlign,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_flex_main_place(
 				self.as_raw_ptr(),
@@ -1040,9 +1220,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_flex_cross_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+	fn set_style_flex_cross_place(
+		&mut self,
+		place: FlexAlign,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_flex_cross_place(
 				self.as_raw_ptr(),
@@ -1050,9 +1235,14 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_flex_track_place(&mut self, place: FlexAlign, selector: StyleSelector) {
+	fn set_style_flex_track_place(
+		&mut self,
+		place: FlexAlign,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_flex_track_place(
 				self.as_raw_ptr(),
@@ -1060,35 +1250,35 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_flex_grow(&mut self, grow: u8, selector: StyleSelector) {
+	fn set_style_flex_grow(&mut self, grow: u8, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_flex_grow(self.as_raw_ptr(), grow, selector.0) };
+		self
 	}
 
-	fn set_style_grid_column_descriptors(&mut self, descriptors: &[i32], selector: StyleSelector) {
-		// Check if the descriptors array ends with GRID_TEMPLATE_LAST, and if not allocate a vec to
-		// hold the descriptors and append GRID_TEMPLATE_LAST.
-		let desc_array = if descriptors.last() == Some(&GRID_TEMPLATE_LAST) {
-			None
-		} else {
-			let mut vec = alloc::vec::Vec::from(descriptors);
-			vec.push(GRID_TEMPLATE_LAST);
-			Some(vec)
-		};
+	fn set_style_grid_column_descriptors(
+		&mut self,
+		descriptors: &'a [i32],
+		selector: StyleSelector,
+	) -> Result<&mut Self> {
+		if descriptors.last() != Some(&GRID_TEMPLATE_LAST) {
+			// If the descriptors array does not end with GRID_TEMPLATE_LAST, return an error.
+			return Err(Error::InvalidGridDescriptors);
+		}
 
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_column_dsc_array(
 				self.as_raw_ptr(),
-				desc_array
-					.as_ref()
-					.map_or(descriptors.as_ptr(), |v| v.as_ptr()),
+				descriptors.as_ptr(),
 				selector.0,
 			)
 		};
+		Ok(self)
 	}
 
-	fn set_style_grid_column_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_grid_column_align(&mut self, align: Align, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_column_align(
 				self.as_raw_ptr(),
@@ -1096,43 +1286,48 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_grid_row_descriptors(&mut self, descriptors: &[i32], selector: StyleSelector) {
-		// Check if the descriptors array ends with GRID_TEMPLATE_LAST, and if not allocate a vec to
-		// hold the descriptors and append GRID_TEMPLATE_LAST.
-		let desc_array = if descriptors.last() == Some(&GRID_TEMPLATE_LAST) {
-			None
-		} else {
-			let mut vec = alloc::vec::Vec::from(descriptors);
-			vec.push(GRID_TEMPLATE_LAST);
-			Some(vec)
-		};
+	fn set_style_grid_row_descriptors(
+		&mut self,
+		descriptors: &'a [i32],
+		selector: StyleSelector,
+	) -> Result<&mut Self> {
+		if descriptors.last() != Some(&GRID_TEMPLATE_LAST) {
+			// If the descriptors array does not end with GRID_TEMPLATE_LAST, return an error.
+			return Err(Error::InvalidGridDescriptors);
+		}
 
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_row_dsc_array(
 				self.as_raw_ptr(),
-				desc_array
-					.as_ref()
-					.map_or(descriptors.as_ptr(), |v| v.as_ptr()),
+				descriptors.as_ptr(),
 				selector.0,
 			)
 		};
+		Ok(self)
 	}
 
-	fn set_style_grid_row_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_grid_row_align(&mut self, align: Align, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_row_align(self.as_raw_ptr(), align.into(), selector.0)
 		};
+		self
 	}
 
-	fn set_style_grid_cell_column_pos(&mut self, column: i32, selector: StyleSelector) {
+	fn set_style_grid_cell_column_pos(
+		&mut self,
+		column: i32,
+		selector: StyleSelector,
+	) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_cell_column_pos(self.as_raw_ptr(), column, selector.0)
 		};
+		self
 	}
 
-	fn set_style_grid_cell_x_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_grid_cell_x_align(&mut self, align: Align, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_cell_x_align(
 				self.as_raw_ptr(),
@@ -1140,19 +1335,22 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_grid_cell_column_span(&mut self, span: i32, selector: StyleSelector) {
+	fn set_style_grid_cell_column_span(&mut self, span: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_cell_column_span(self.as_raw_ptr(), span, selector.0)
 		};
+		self
 	}
 
-	fn set_style_grid_cell_row_pos(&mut self, row: i32, selector: StyleSelector) {
+	fn set_style_grid_cell_row_pos(&mut self, row: i32, selector: StyleSelector) -> &mut Self {
 		unsafe { lvgl_sys::lv_obj_set_style_grid_cell_row_pos(self.as_raw_ptr(), row, selector.0) };
+		self
 	}
 
-	fn set_style_grid_cell_y_align(&mut self, align: Align, selector: StyleSelector) {
+	fn set_style_grid_cell_y_align(&mut self, align: Align, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_cell_y_align(
 				self.as_raw_ptr(),
@@ -1160,14 +1358,166 @@ pub trait Widget: AsRawObj {
 				selector.0,
 			)
 		};
+		self
 	}
 
-	fn set_style_grid_cell_row_span(&mut self, span: i32, selector: StyleSelector) {
+	fn set_style_grid_cell_row_span(&mut self, span: i32, selector: StyleSelector) -> &mut Self {
 		unsafe {
 			lvgl_sys::lv_obj_set_style_grid_cell_row_span(self.as_raw_ptr(), span, selector.0)
 		};
+		self
+	}
+
+	fn set_grid_desc_array(
+		&mut self,
+		col_desc: &'a [i32],
+		row_desc: &'a [i32],
+	) -> Result<&mut Self> {
+		if col_desc.last() != Some(&GRID_TEMPLATE_LAST)
+			|| row_desc.last() != Some(&GRID_TEMPLATE_LAST)
+		{
+			// If either of the descriptor arrays does not end with GRID_TEMPLATE_LAST, return an error.
+			return Err(Error::InvalidGridDescriptors);
+		}
+
+		unsafe {
+			lvgl_sys::lv_obj_set_grid_dsc_array(
+				self.as_raw_ptr(),
+				col_desc.as_ptr(),
+				row_desc.as_ptr(),
+			)
+		};
+		Ok(self)
+	}
+
+	fn set_grid_cell(
+		&mut self,
+		column_align: GridAlign,
+		column_pos: i32,
+		column_span: i32,
+		row_align: GridAlign,
+		row_pos: i32,
+		row_span: i32,
+	) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_grid_cell(
+				self.as_raw_ptr(),
+				column_align.into(),
+				column_pos,
+				column_span,
+				row_align.into(),
+				row_pos,
+				row_span,
+			)
+		};
+		self
+	}
+
+	fn set_style_pad_all(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_pad_left(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_right(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_top(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_bottom(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_pad_hor(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_pad_left(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_right(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_pad_ver(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_pad_top(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_bottom(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_margin_all(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_margin_left(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_margin_right(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_margin_top(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_margin_bottom(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_margin_hor(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_margin_left(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_margin_right(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_margin_ver(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_margin_top(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_margin_bottom(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_pad_gap(&mut self, value: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_pad_row(self.as_raw_ptr(), value, selector.0);
+			lvgl_sys::lv_obj_set_style_pad_column(self.as_raw_ptr(), value, selector.0);
+		}
+		self
+	}
+
+	fn set_style_size(&mut self, width: i32, height: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_width(self.as_raw_ptr(), width, selector.0);
+			lvgl_sys::lv_obj_set_style_height(self.as_raw_ptr(), height, selector.0);
+		}
+		self
+	}
+
+	fn set_style_transform_scale(&mut self, scale: i32, selector: StyleSelector) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_style_transform_scale_x(self.as_raw_ptr(), scale, selector.0);
+			lvgl_sys::lv_obj_set_style_transform_scale_y(self.as_raw_ptr(), scale, selector.0);
+		}
+		self
+	}
+
+	fn set_flex_flow(&mut self, flow: FlexFlow) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_flex_flow(self.as_raw_ptr(), flow as lvgl_sys::lv_flex_flow_t)
+		};
+		self
+	}
+
+	fn set_flex_align(
+		&mut self,
+		main_place: FlexAlign,
+		cross_place: FlexAlign,
+		track_cross_place: FlexAlign,
+	) -> &mut Self {
+		unsafe {
+			lvgl_sys::lv_obj_set_flex_align(
+				self.as_raw_ptr(),
+				main_place as lvgl_sys::lv_flex_align_t,
+				cross_place as lvgl_sys::lv_flex_align_t,
+				track_cross_place as lvgl_sys::lv_flex_align_t,
+			)
+		};
+		self
+	}
+
+	fn set_flex_grow(&mut self, grow: u8) -> &mut Self {
+		unsafe { lvgl_sys::lv_obj_set_flex_grow(self.as_raw_ptr(), grow) };
+		self
 	}
 }
 
-impl Widget for Obj {}
-impl<'a> Widget for ObjRef<'a> {}
+impl<'a> Widget<'a> for Obj {}
+impl<'a> Widget<'a> for ObjRef<'a> {}

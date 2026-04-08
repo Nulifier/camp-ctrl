@@ -1,5 +1,5 @@
 use crate::widgets::base::Widget;
-use crate::widgets::obj::{AsRawObj, Obj};
+use crate::widgets::obj::{AsRawObj, Obj, WidgetClassMarker};
 use core::ffi::CStr;
 use core::ptr::NonNull;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -14,6 +14,7 @@ pub enum LabelLongMode {
 	Clip = lvgl_sys::lv_label_long_mode_t_LV_LABEL_LONG_MODE_CLIP,
 }
 
+#[repr(transparent)]
 pub struct Label {
 	obj: Obj,
 }
@@ -22,7 +23,7 @@ impl Label {
 	pub fn new(parent: &impl AsRawObj) -> Self {
 		let raw = unsafe { lvgl_sys::lv_label_create(parent.as_raw_ptr()) };
 		Self {
-			obj: Obj::from_raw(raw).expect("Failed to create label"),
+			obj: Obj::from_raw(raw),
 		}
 	}
 
@@ -30,12 +31,14 @@ impl Label {
 		unsafe { CStr::from_ptr(lvgl_sys::lv_label_get_text(self.obj.as_raw_ptr())) }
 	}
 
-	pub fn set_text(&mut self, text: &CStr) {
+	pub fn set_text(&mut self, text: &CStr) -> &mut Self {
 		unsafe { lvgl_sys::lv_label_set_text(self.obj.as_raw_ptr(), text.as_ptr()) };
+		self
 	}
 
-	pub fn set_text_static(&mut self, text: &'static CStr) {
+	pub fn set_text_static(&mut self, text: &'static CStr) -> &mut Self {
 		unsafe { lvgl_sys::lv_label_set_text_static(self.obj.as_raw_ptr(), text.as_ptr()) };
+		self
 	}
 
 	pub fn get_long_mode(&self) -> LabelLongMode {
@@ -66,4 +69,10 @@ impl AsRawObj for Label {
 	}
 }
 
-impl Widget for Label {}
+impl<'a> Widget<'a> for Label {}
+
+impl WidgetClassMarker for Label {
+	fn class_ptr() -> *const lvgl_sys::lv_obj_class_t {
+		unsafe { &lvgl_sys::lv_label_class as *const _ }
+	}
+}
