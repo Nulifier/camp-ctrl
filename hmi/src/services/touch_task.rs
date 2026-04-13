@@ -1,10 +1,10 @@
 use crate::{
+	board::TouchResources,
 	drivers::{i2c, touch},
 	error::Result,
 };
 use defmt::{info, unwrap, warn};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_rp::{Peri, gpio::AnyPin};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, pubsub};
 
 pub use crate::drivers::touch::MAX_NUM_POINTS as MAX_TOUCH_POINTS;
@@ -45,13 +45,14 @@ pub fn subscribe() -> Result<TouchEventSubscriber> {
 
 #[embassy_executor::task]
 pub async fn touch_task(
-	pin_tp_rst: Peri<'static, AnyPin>,
-	pin_int: Peri<'static, AnyPin>,
+	// pin_tp_rst: Peri<'static, AnyPin>,
+	// pin_int: Peri<'static, AnyPin>,
 	i2c_dev: I2cDevice<'static, CriticalSectionRawMutex, i2c::I2cDriver>,
-) -> ! {
+	r: TouchResources,
+) {
 	// Initialize the touch driver
 	info!("Initializing touch driver");
-	let mut touch_driver = crate::drivers::touch::TouchDriver::new(i2c_dev, pin_tp_rst, pin_int);
+	let mut touch_driver = crate::drivers::touch::TouchDriver::new(i2c_dev, r);
 	unwrap!(touch_driver.initialize().await);
 	info!("Touch driver initialized successfully");
 

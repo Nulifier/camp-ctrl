@@ -1,10 +1,8 @@
 use core::cmp::min;
 
+use crate::board::TouchResources;
 use crate::error::{Error, Result};
-use embassy_rp::{
-	Peri,
-	gpio::{AnyPin, Flex, Level, Output},
-};
+use embassy_rp::gpio::{Flex, Level, Output};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::i2c::{Error as _, Operation};
 use heapless::Vec;
@@ -63,12 +61,13 @@ pub struct TouchDriver<I2C: embedded_hal_async::i2c::I2c> {
 impl<I2C: embedded_hal_async::i2c::I2c> TouchDriver<I2C> {
 	pub fn new(
 		i2c_dev: I2C,
-		rst_pin: Peri<'static, AnyPin>,
-		int_pin: Peri<'static, AnyPin>,
+		r: TouchResources,
+		// rst_pin: Peri<'static, AnyPin>,
+		// int_pin: Peri<'static, AnyPin>,
 	) -> Self {
 		TouchDriver {
-			rst_pin: Output::new(rst_pin, Level::Low),
-			int_pin: Flex::new(int_pin),
+			rst_pin: Output::new(r.tp_rst, Level::Low),
+			int_pin: Flex::new(r.tp_int),
 			i2c: i2c_dev,
 		}
 	}

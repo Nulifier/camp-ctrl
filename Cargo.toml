@@ -8,7 +8,9 @@ members = [
 	#"hmi-sim",
 	"hmi",
 ]
-
+exclude = [
+	"hmi-sim"
+]
 
 # cargo build/run
 [profile.dev]

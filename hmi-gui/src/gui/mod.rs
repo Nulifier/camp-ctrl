@@ -1,3 +1,4 @@
+use crate::future::RtcTime;
 use crate::gui::header::GuiHeader;
 use crate::gui::tabs::GuiTabs;
 use alloc::rc::Rc;
@@ -32,7 +33,7 @@ impl Gui {
 		let screen = lvgl::active_screen().expect("Failed to get active screen");
 		let header = Rc::new(RefCell::new(GuiHeader::new(&screen)));
 
-		let header_for_tabs = Rc::clone(&header);
+		let header_for_tabs = header.clone();
 		let tabs = GuiTabs::new(&screen, move |active_index| {
 			let tab_name = TAB_NAMES
 				.get(active_index as usize)
@@ -41,8 +42,10 @@ impl Gui {
 			header_for_tabs.borrow_mut().set_tab_name(tab_name);
 		});
 
-		header.borrow_mut().set_tab_name(TAB_NAMES[1]);
-
 		Self { header, tabs }
+	}
+
+	pub fn set_time(&mut self, time: &RtcTime) {
+		self.header.borrow_mut().set_time(time);
 	}
 }

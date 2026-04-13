@@ -2,7 +2,10 @@ use core::ptr::NonNull;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::error::{Error, Result};
+use crate::{
+	AsRaw, AsRawMut,
+	error::{Error, Result},
+};
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
@@ -13,7 +16,7 @@ pub enum DisplayRotation {
 	Rotation270 = lvgl_sys::lv_display_rotation_t_LV_DISPLAY_ROTATION_270,
 }
 
-pub trait LvDisplay: Sized {
+pub trait LvDisplay: Sized + AsRaw<lvgl_sys::lv_disp_t> + AsRawMut<lvgl_sys::lv_disp_t> {
 	fn _display(&self) -> NonNull<lvgl_sys::lv_disp_t>;
 
 	/// # Safety
@@ -147,6 +150,22 @@ impl SdlDisplay {
 		let disp = unsafe { lvgl_sys::lv_sdl_window_create(width, height) };
 		let disp = NonNull::new(disp).ok_or(Error::DisplayCreateFailed)?;
 		Ok(Self { disp })
+	}
+}
+
+#[cfg(feature = "sdl")]
+impl AsRaw<lvgl_sys::lv_disp_t> for SdlDisplay {
+	#[inline(always)]
+	fn as_raw(&self) -> *const lvgl_sys::lv_disp_t {
+		self.disp.as_ptr()
+	}
+}
+
+#[cfg(feature = "sdl")]
+impl AsRawMut<lvgl_sys::lv_disp_t> for SdlDisplay {
+	#[inline(always)]
+	fn as_raw_mut(&mut self) -> *mut lvgl_sys::lv_disp_t {
+		self.disp.as_ptr()
 	}
 }
 

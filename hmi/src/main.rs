@@ -1,148 +1,121 @@
 #![no_std]
 #![no_main]
 
-use defmt::info;
+use crate::board::{
+	AssignedResources, BacklightResources, DisplayResources, I2c1Resources, PsramResources,
+	TouchResources,
+};
+use crate::services::backlight::{backlight_task, wake_screen};
+use crate::services::gui::gui_task;
+use core::mem::MaybeUninit;
+use core::ptr::addr_of_mut;
+use defmt::{info, unwrap};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::Spawner;
+use embassy_executor::Executor;
 use embassy_rp::block::ImageDef;
-use embassy_rp::gpio::{AnyPin, Input, Output};
-use embassy_rp::{self as hal, Peri};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_time::{Duration, Instant, Timer};
+use embassy_rp::multicore::{Stack, spawn_core1};
+use embassy_rp::{self as hal};
+use embedded_alloc::TlsfHeap as Heap;
 
 pub mod board;
 pub mod drivers;
 pub mod error;
-pub mod tasks;
+pub mod gui;
+pub mod services;
 pub mod touch;
+pub mod utils;
 
 // Panic handler
 use panic_probe as _;
 // Defmt logging
 use defmt_rtt as _;
+use static_cell::StaticCell;
 
 use crate::drivers::i2c::{self};
-use crate::drivers::touch::TouchDriver;
 
 // Tell the boot ROM about our application
 #[unsafe(link_section = ".start_block")]
 #[used]
 pub static IMAGE_DEF: ImageDef = hal::block::ImageDef::secure_exe();
 
+static mut CORE1_STACK: Stack<4096> = Stack::new();
+static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
+static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+
+const HEAP_SIZE: usize = 16 * 1024; // 16 KB
+#[global_allocator]
+static HEAP: Heap = Heap::empty();
+
 #[embassy_executor::task]
-async fn wake_screen(
-	pin_tp_rst: Peri<'static, AnyPin>,
-	pin_int: Peri<'static, AnyPin>,
-	pin_lcd_bl: Peri<'static, AnyPin>,
-	i2c_dev: I2cDevice<'static, CriticalSectionRawMutex, i2c::I2cDriver>,
-) {
-	// info!("Starting wake_screen task");
-
-	// let mut touch_driver = TouchDriver::new(i2c_dev, pin_tp_rst, pin_int);
-
-	// info!("Touch driver initialized");
-
-	// // Turn on the touch sensor reset pin (active low)
-	// let mut out_tp_rst = Output::new(pin_tp_rst, embassy_rp::gpio::Level::Low);
-	// out_tp_rst.set_high();
-
-	// // Wait for 500ms to allow the touch sensor to reset
-	// Timer::after(Duration::from_millis(500)).await;
-
-	// // When pin_int goes high, wake the LCD up by setting pin_lcd_bl high for 5 seconds, then low again.
-	// let mut in_int = Input::new(pin_int, embassy_rp::gpio::Pull::None);
-	// let mut out_lcd_bl = Output::new(pin_lcd_bl, embassy_rp::gpio::Level::Low);
-
-	// // Read GT911 product ID for debugging
-	// match touch_driver.read_product_id().await {
-	// 	Ok(product_id) => {
-	// 		info!(
-	// 			"GT911 Product ID: {}{}{}{}",
-	// 			product_id[0] as char,
-	// 			product_id[1] as char,
-	// 			product_id[2] as char,
-	// 			product_id[3] as char
-	// 		);
-	// 	}
-	// 	Err(_) => {
-	// 		info!("Failed to read GT911 Product ID");
-	// 	}
-	// }
-
-	// let mut last_touch_time = Instant::now();
+async fn dimmer() {
+	let mut touch_event_sub = services::touch_task::subscribe().unwrap();
 
 	loop {
-		// in_int.wait_for_falling_edge().await;
-		// // info!("Pin INT went high, reading touch info");
+		match touch_event_sub.next_message_pure().await {
+			services::touch_task::TouchEvent::Touched(points) => {
+				let first_point = &points[0];
+				info!("Touched at ({}, {})", first_point.x, first_point.y);
 
-		// touch_driver.read_points().await.unwrap();
+				// Scale y value to brightness (0-100)
+				let brightness = (first_point.y as u32 * 100 / 480) as u8;
 
-		// // info!("There are {} touch points", touch_driver.point_count());
-
-		// if touch_driver.point_count() > 0 {
-		// 	info!("There are {} touch points", touch_driver.point_count());
-
-		// 	let points = touch_driver.points();
-		// 	for (i, point) in points.iter().enumerate() {
-		// 		info!(
-		// 			"Touch point {}: ID={}, x={}, y={}, size={}",
-		// 			i, point.id, point.x, point.y, point.size
-		// 		);
-		// 	}
-
-		// 	info!("Turning LCD backlight on");
-		// 	out_lcd_bl.set_high();
-		// 	last_touch_time = Instant::now();
-		// } else {
-		// 	if out_lcd_bl.get_output_level() == embassy_rp::gpio::Level::High {
-		// 		// Check if its been 2 seconds since the last touch, and if so, turn off the backlight
-		// 		if Instant::now() - last_touch_time > Duration::from_secs(2) {
-		// 			info!("No touch points, turning LCD backlight off");
-		// 			out_lcd_bl.set_low();
-		// 		}
-		// 	}
-		// }
+				crate::services::backlight::set_brightness(brightness);
+			}
+			_ => {}
+		}
 	}
 }
 
-#[embassy_executor::main]
-async fn main(spawner: Spawner) {
-	let p = board::init();
-
-	info!("Hello, world!");
-
-	let _i2c = i2c::init(p.i2c.i2c, p.i2c.scl, p.i2c.sda);
-
-	// let i2c = i2c::I2cDriver::new(
-	// 	p.i2c.scl, // placeholder, real impl would pass in the I2C peripheral and pins
-	// 	Peri::take().unwrap(),
-	// 	Peri::take().unwrap(),
-	// );
-
-	// spawner
-	// 	.spawn(wake_screen(
-	// 		p.touch.tp_rst.into(),   // Touch sensor reset pin
-	// 		p.touch.tp_int.into(),   // LCD interrupt pin
-	// 		p.display.lcd_bl.into(), // LCD backlight control pin
-	// 		i2c_dev_touch,
-	// 	))
-	// 	.unwrap();
-
-	spawner
-		.spawn(tasks::touch_task::touch_task(
-			p.touch.tp_rst.into(),
-			p.touch.tp_int.into(),
-			I2cDevice::new(_i2c),
-		))
-		.unwrap();
-
-	// Turn on GPIO45 (the LCD backlight)
-	// let mut lcd_bl = Output::new(p.PIN_45, embassy_rp::gpio::Level::Low);
-	// lcd_bl.set_low();
-
-	loop {
-		Timer::after_millis(100).await;
+#[cortex_m_rt::entry]
+fn main() -> ! {
+	// Initialize the heap allocator
+	{
+		static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+		unsafe {
+			HEAP.init(&raw mut HEAP_MEM as usize, HEAP_SIZE);
+		}
 	}
+
+	let p = hal::init(Default::default());
+	let r = split_resources!(p);
+
+	// Initialize the PSRAM allocator
+	utils::psram::init_psram_heap(r.psram);
+
+	spawn_core1(
+		p.CORE1,
+		unsafe { &mut *addr_of_mut!(CORE1_STACK) },
+		move || {
+			let executor1 = EXECUTOR1.init(Executor::new());
+			executor1.run(|_spawner| {
+				//////////////////////////////////////////////////////////////
+				// Core1: UI and related tasks
+				unwrap!(_spawner.spawn(gui_task()));
+			})
+		},
+	);
+
+	let executor0 = EXECUTOR0.init(Executor::new());
+	executor0.run(|spawner| {
+		//////////////////////////////////////////////////////////////
+		// Core0: Drivers and services
+
+		let i2c = i2c::init(r.i2c1);
+
+		unwrap!(spawner.spawn(backlight_task(r.backlight)));
+
+		spawner
+			.spawn(services::touch_task::touch_task(
+				// r.touch.tp_rst.into(),
+				// r.touch.tp_int.into(),
+				I2cDevice::new(i2c),
+				r.touch,
+			))
+			.unwrap();
+
+		spawner.spawn(dimmer()).unwrap();
+		spawner.spawn(wake_screen()).unwrap();
+	});
 }
 
 // Program metadata for `picotool info`

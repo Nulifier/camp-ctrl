@@ -8,6 +8,7 @@ pub enum Error {
 	TouchDriverInitFailed,
 	PubSubError(pubsub::Error),
 	I2cError(i2c::ErrorKind),
+	PsramAllocationFailed,
 }
 
 impl From<pubsub::Error> for Error {
