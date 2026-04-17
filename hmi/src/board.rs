@@ -44,6 +44,8 @@ assign_resources! {
 		lcd_r7: PIN_39,
 
 		pio_rgb: PIO1,
+
+		dma: DMA_CH0,
 	}
 	backlight: BacklightResources {
 		lcd_en: PIN_45,

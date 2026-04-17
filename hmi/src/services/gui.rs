@@ -26,6 +26,8 @@ pub async fn gui_task(
 
 	loop {
 		// Wait for 1 second
-		Timer::after(Duration::from_secs(10)).await;
+		// Timer::after(Duration::from_secs(10)).await;
+
+		disp.push_test().await.unwrap();
 	}
 }

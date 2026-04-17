@@ -98,35 +98,6 @@ pub fn load_hsync_program<PIO: Instance>(
 pub fn load_rgb_de_program<PIO: Instance>(
 	common: &mut Common<'static, PIO>,
 ) -> Result<pio::LoadedProgram<'static, PIO>> {
-	// let program = pio_asm!(
-	// 	r#".side_set 1 opt             ; LCD_DE_PIN(bit0)
-	// 	.define public T1 31           ; vsync BackPorch
-	// 	.define public T2 31           ; hsync BackPorch
-	// 	pull block side 0              ; Load the width to osr
-	// 	.wrap_target
-	// 	mov y osr side 0               ; Save width to y
-	// 	set x, T1 side 0
-	// 	wait 0 pin 5 side 0            ; Wait for vsync to go low
-	// 	wait 1 pin 5 side 0            ; Wait for vsync to go high
-	// 	vBackPorch:
-	// 	  wait 0 pin 6 side 0          ; Wait for hsync to go low
-	// 	  wait 1 pin 6 side 0          ; Wait for hsync to go high
-	// 	  jmp x--, vBackPorch side 0
-	// 	ActiveFor:
-	// 	  wait 0 pin 6 side 0          ; Wait for hsync to go low
-	// 	  wait 1 pin 6 side 0          ; Wait for hsync to go high
-	// 	  set x, T2 side 0
-	// 	  hBackPorch:
-	// 	    wait 0 pin 7 side 0        ; Wait for pclk to go low
-	// 	    wait 1 pin 7 side 0        ; Wait for pclk to go high
-	// 	    jmp x--, hBackPorch side 0
-	// 	  wait 1 pin 7 side 0          ; Wait for pclk to go high
-	// 	  wait 1 irq 0 side 1          ; Wait for program rgb to finish sending a line of data
-	// 	  jmp y--, ActiveFor side 0
-	// 	.wrap
-	// 	"#,
-	// )
-	// .program;
 	let program = pio_asm!(
 		r#".side_set 1 opt             ; LCD_DE_PIN(bit0)
 		.define public T1 31           ; vsync BackPorch
