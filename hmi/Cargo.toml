@@ -15,6 +15,7 @@ panic-probe = { version = "1.0.0", features = ["print-defmt"] }
 embassy-executor = { version = "0.9", features = [
 	"arch-cortex-m",
 	"executor-thread",
+	"executor-interrupt",
 	"defmt",
 ] }
 embassy-time = { version = "0.5.0" }
@@ -47,5 +48,5 @@ embedded-alloc = { version = "0.7.0", default-features = false, features = [
 	"tlsf",
 ] }
 rlsf = { version = "0.2.1", default-features = false }
-const-default = {version = "1.0.0", default-features = false }
+const-default = { version = "1.0.0", default-features = false }
 critical-section = "1.2.0"

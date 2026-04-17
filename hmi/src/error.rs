@@ -9,6 +9,8 @@ pub enum Error {
 	PubSubError(pubsub::Error),
 	I2cError(i2c::ErrorKind),
 	PsramAllocationFailed,
+	PioProgramLoadFailed,
+	InvalidDisplayTiming,
 }
 
 impl From<pubsub::Error> for Error {

@@ -69,8 +69,52 @@ impl Color {
 	}
 }
 
+#[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct Color16(lvgl_sys::lv_color16_t);
+
+impl Color16 {
+	pub fn from_rgb8(red: u8, green: u8, blue: u8) -> Self {
+		Self(lvgl_sys::lv_color16_t {
+			_bitfield_align_1: [],
+			_bitfield_1: lvgl_sys::lv_color16_t::new_bitfield_1(
+				(blue >> 3) as u16,
+				(green >> 2) as u16,
+				(red >> 3) as u16,
+			),
+		})
+	}
+
+	#[inline(always)]
+	pub fn red(&self) -> u8 {
+		self.0.red() as u8
+	}
+
+	#[inline(always)]
+	pub fn green(&self) -> u8 {
+		self.0.green() as u8
+	}
+
+	#[inline(always)]
+	pub fn blue(&self) -> u8 {
+		self.0.blue() as u8
+	}
+
+	#[inline(always)]
+	pub fn set_red(&mut self, red: u8) {
+		self.0.set_red(red as u16);
+	}
+
+	#[inline(always)]
+	pub fn set_green(&mut self, green: u8) {
+		self.0.set_green(green as u16);
+	}
+
+	#[inline(always)]
+	pub fn set_blue(&mut self, blue: u8) {
+		self.0.set_blue(blue as u16);
+	}
+}
 
 #[allow(dead_code)]
 pub struct Color32(lvgl_sys::lv_color32_t);

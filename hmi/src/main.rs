@@ -2,8 +2,8 @@
 #![no_main]
 
 use crate::board::{
-	AssignedResources, BacklightResources, DisplayResources, I2c1Resources, PsramResources,
-	TouchResources,
+	AssignedResources, BacklightResources, DisplayCtrlResources, DisplayDataResources,
+	DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
 };
 use crate::services::backlight::{backlight_task, wake_screen};
 use crate::services::gui::gui_task;
@@ -11,10 +11,11 @@ use core::mem::MaybeUninit;
 use core::ptr::addr_of_mut;
 use defmt::{info, unwrap};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::Executor;
+use embassy_executor::{Executor, InterruptExecutor};
 use embassy_rp::block::ImageDef;
+use embassy_rp::interrupt::InterruptExt;
 use embassy_rp::multicore::{Stack, spawn_core1};
-use embassy_rp::{self as hal};
+use embassy_rp::{self as hal, interrupt};
 use embedded_alloc::TlsfHeap as Heap;
 
 pub mod board;
@@ -40,7 +41,8 @@ pub static IMAGE_DEF: ImageDef = hal::block::ImageDef::secure_exe();
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
-static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+static EXECUTOR1_HIGH: InterruptExecutor = InterruptExecutor::new();
+static EXECUTOR1_GUI: StaticCell<Executor> = StaticCell::new();
 
 const HEAP_SIZE: usize = 16 * 1024; // 16 KB
 #[global_allocator]
@@ -66,6 +68,19 @@ async fn dimmer() {
 	}
 }
 
+#[embassy_executor::task]
+async fn do_stuff() {
+	loop {
+		info!("Doing stuff...");
+		embassy_time::Timer::after(embassy_time::Duration::from_secs(5)).await;
+	}
+}
+
+#[interrupt]
+unsafe fn SWI_IRQ_0() {
+	unsafe { EXECUTOR1_HIGH.on_interrupt() };
+}
+
 #[cortex_m_rt::entry]
 fn main() -> ! {
 	// Initialize the heap allocator
@@ -86,11 +101,17 @@ fn main() -> ! {
 		p.CORE1,
 		unsafe { &mut *addr_of_mut!(CORE1_STACK) },
 		move || {
-			let executor1 = EXECUTOR1.init(Executor::new());
-			executor1.run(|_spawner| {
+			// Setup the executor for core 1 to run higher priority tasks
+			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
+			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
+			unwrap!(spawner1_high.spawn(do_stuff()));
+
+			// Run the GUI on core 1 at lower priority
+			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
+			executor1_gui.run(|_spawner| {
 				//////////////////////////////////////////////////////////////
 				// Core1: UI and related tasks
-				unwrap!(_spawner.spawn(gui_task()));
+				unwrap!(_spawner.spawn(gui_task(r.display_ctrl, r.display_timing, r.display_data)));
 			})
 		},
 	);

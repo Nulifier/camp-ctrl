@@ -25,7 +25,7 @@ struct PsramHeapInner {
 unsafe impl Sync for PsramHeapInner {}
 unsafe impl Send for PsramHeapInner {}
 
-struct PsramHeap {
+pub struct PsramHeap {
 	heap: Mutex<RefCell<PsramHeapInner>>,
 }
 
@@ -198,9 +198,15 @@ impl<T: Sized, const N: usize> Drop for PsramBuffer<T, N> {
 }
 
 impl<T: Sized, const N: usize> core::ops::Deref for PsramBuffer<T, N> {
-	type Target = [T; N];
+	type Target = [T];
 
 	fn deref(&self) -> &Self::Target {
 		unsafe { self.ptr.as_ref() }
+	}
+}
+
+impl<T: Sized, const N: usize> core::ops::DerefMut for PsramBuffer<T, N> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		unsafe { self.ptr.as_mut() }
 	}
 }
