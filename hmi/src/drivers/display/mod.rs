@@ -95,8 +95,8 @@ impl DisplayDriver {
 	}
 
 	pub fn start(&mut self) -> Result<()> {
-		self.timing_engine.start()?;
 		self.rgb_engine.start()?;
+		self.timing_engine.start()?;
 
 		Ok(())
 	}

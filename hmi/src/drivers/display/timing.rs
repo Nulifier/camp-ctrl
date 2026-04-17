@@ -89,14 +89,10 @@ impl TimingEngine {
 			// Enable
 			b.set_enable(&mut self.sm0, true);
 			b.set_enable(&mut self.sm1, true);
-			// b.set_enable(&mut self.sm2, true);
-			// b.set_enable(&mut self.sm3, true);
 
 			// Restart
 			b.restart(&mut self.sm0);
 			b.restart(&mut self.sm1);
-			// b.restart(&mut self.sm2);
-			// b.restart(&mut self.sm3);
 		});
 
 		Ok(())
