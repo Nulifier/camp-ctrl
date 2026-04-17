@@ -19,7 +19,7 @@ mod timing;
 const PCLK_FREQUENCY: u32 = 25_000_000; // 25 MHz
 
 /// Number of lines of pixel data to buffer in SRAM (as opposed to PSRAM)
-const SRAM_BUFFER_LINES: usize = 4;
+const SRAM_BUFFER_LINES: usize = 16;
 
 bind_interrupts!(struct Irqs {
 	PIO0_IRQ_0 => InterruptHandler<peripherals::PIO0>;
@@ -34,6 +34,8 @@ pub struct DisplayDriver {
 
 	sram_buffer_0: [u16; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES],
 	sram_buffer_1: [u16; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES],
+
+	buffers: buffers::DoubleBuffers<{ DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize }, u16>,
 }
 
 impl DisplayDriver {
@@ -60,18 +62,22 @@ impl DisplayDriver {
 		for line in 0..SRAM_BUFFER_LINES {
 			for x in 0..DISPLAY_WIDTH as usize {
 				let color = match x {
-					0..=199 => lvgl::misc::color::Color16::from_rgb8(255, 0, 0), // Red
-					200..=399 => lvgl::misc::color::Color16::from_rgb8(0, 255, 0), // Green
-					400..=599 => lvgl::misc::color::Color16::from_rgb8(0, 0, 255), // Blue
-					600..=799 => lvgl::misc::color::Color16::from_rgb8(255, 0, 255), // Magenta
-					_ => lvgl::misc::color::Color16::from_rgb8(0, 0, 0),         // Black
+					0..=99 => lvgl::misc::color::Color16::from_rgb8(255, 0, 0), // Red
+					100..=199 => lvgl::misc::color::Color16::from_rgb8(255, 255, 0), // Yellow
+					200..=299 => lvgl::misc::color::Color16::from_rgb8(0, 255, 0), // Green
+					300..=399 => lvgl::misc::color::Color16::from_rgb8(0, 255, 255), // Cyan
+					400..=499 => lvgl::misc::color::Color16::from_rgb8(0, 0, 255), // Blue
+					500..=599 => lvgl::misc::color::Color16::from_rgb8(255, 0, 255), // White
+					600..=699 => lvgl::misc::color::Color16::from_rgb8(255, 255, 255), // Magenta
+					700..=799 => lvgl::misc::color::Color16::from_rgb8(128, 128, 128), // Gray
+					_ => lvgl::misc::color::Color16::from_rgb8(0, 0, 0),        // Black
 				};
 
-				let color_u16 = unsafe { core::mem::transmute(color) };
+				let color_u16: u16 = unsafe { core::mem::transmute(color) };
 
-				if line == 1 {
-					self.sram_buffer_0[line * DISPLAY_WIDTH as usize + x] = color_u16;
-					self.sram_buffer_1[line * DISPLAY_WIDTH as usize + x] = color_u16;
+				if line >= SRAM_BUFFER_LINES / 2 {
+					self.sram_buffer_0[line * DISPLAY_WIDTH as usize + x] = color_u16.swap_bytes();
+					self.sram_buffer_1[line * DISPLAY_WIDTH as usize + x] = color_u16.swap_bytes();
 				} else {
 					self.sram_buffer_0[line * DISPLAY_WIDTH as usize + x] = color_u16;
 					self.sram_buffer_1[line * DISPLAY_WIDTH as usize + x] = color_u16;

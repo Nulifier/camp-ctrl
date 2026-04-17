@@ -94,29 +94,29 @@ pull block side 0              ; Load the width to osr
 mov y, osr side 0              ; Save width to y
 set x, T_VBACK side 0
 
-wait 0 pin 5 side 0            ; Wait for vsync to go low
-wait 1 pin 5 side 0            ; Wait for vsync to go high
+wait 0 pin 5 side 0                    ; Wait for vsync to go low
+wait 1 pin 5 side 0                    ; Wait for vsync to go high
 
 vBackPorch:
-	wait 0 pin 6 side 0          ; Wait for hsync to go low
-	wait 1 pin 6 side 0          ; Wait for hsync to go high
+	wait 0 pin 6 side 0                ; Wait for hsync to go low
+	wait 1 pin 6 side 0                ; Wait for hsync to go high
 	jmp x--, vBackPorch side 0
 
 ActiveFor:
-	wait 0 pin 6 side 0          ; Wait for hsync to go low
-	wait 1 pin 6 side 0          ; Wait for hsync to go high
+	wait 0 pin 6 side 0                ; Wait for hsync to go low
+	wait 1 pin 6 side 0                ; Wait for hsync to go high
 
 	set x, T_HBACK side 0
 	hBackPorch:
-		wait 0 pin 7 side 0        ; Wait for pclk to go low
-		wait 1 pin 7 side 0        ; Wait for pclk to go high
+		wait 0 pin 7 side 0            ; Wait for pclk to go low
+		wait 1 pin 7 side 0            ; Wait for pclk to go high
 		jmp x--, hBackPorch side 0
 	
-	wait 1 pin 7 side 0          ; Wait for pclk to go high
+	wait 1 pin 7 side 0                ; Wait for pclk to go high
 
-	irq set 1 side 1             ; Raise DE and signal RGB start-of-line
+	irq set 1 side 0				   ; Tell RGB program to start the line
 
-	wait 1 irq 0 side 1          ; Wait for RGB program to finish the line
+	wait 1 irq 0 side 1                ; Wait for RGB program to finish the line
 	jmp y--, ActiveFor side 0
 
 .wrap
@@ -131,13 +131,14 @@ mov y, osr                     ; Save width to y
 .wrap_target
 
 mov x,y                        ; Save width to x
-wait 1 irq 1                 ; Wait until DE program starts active line
-; wait 1 pin 4
+; wait 1 pin 4                   ; Wait until DE program starts active line
+wait 1 irq 1                   ; Wait until DE program starts active line
 ColorOut:
 	pull block                 ; One RGB565 pixel in low 16 bits
 	wait 0 pin 7               ; pclk == 0
 	out pins, 16               ; Send rgb data
 	wait 1 pin 7               ; pclk == 1
 	jmp x--, ColorOut
+
 irq set 0                      ; Tell program rgb_de that a row of data has been flushed
 .wrap

@@ -169,8 +169,6 @@ impl RgbEngine {
 		self.sm0.tx().push((DISPLAY_HEIGHT - 1) as u32);
 		// Pass the width to the RGB program
 		self.sm1.tx().push((DISPLAY_WIDTH - 1) as u32);
-		// Pass a dummy color to the RGB program, TODO: Remove this once we have a way to stream pixel data into the PIO
-		// self.sm1.tx().push(0xF800);
 
 		Ok(())
 	}
