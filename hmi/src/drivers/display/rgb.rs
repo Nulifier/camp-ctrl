@@ -1,10 +1,7 @@
-use crate::board::DisplayDataResources;
 use crate::error::Result;
-use embassy_rp::{
-	Peri,
-	dma::{self, Word},
-	gpio, peripherals, pio,
-};
+use crate::{board::DisplayDataResources, drivers::display::rgb};
+use defmt::info;
+use embassy_rp::{Peri, dma::Word, gpio, peripherals, pio};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub(super) struct RgbEngine {
@@ -91,6 +88,18 @@ impl RgbEngine {
 		let de_prg = super::pio_progs::load_rgb_de_program(&mut self.common2)?;
 		let mut de_cfg = pio::Config::default();
 		de_cfg.use_program(&de_prg, &[&self.de_pin]);
+		unsafe {
+			de_cfg.set_pins(pio::PinConfig {
+				in_base: 16,
+				out_base: 24,
+				out_count: 16,
+				set_base: 16,
+				set_count: 0,
+				sideset_base: 20,
+				sideset_count: 1,
+			})
+		};
+
 		// de_cfg.clock_divider = divider;
 		de_cfg.fifo_join = pio::FifoJoin::TxOnly;
 
@@ -119,7 +128,19 @@ impl RgbEngine {
 		let rgb_prg = super::pio_progs::load_rgb_program(&mut self.common2)?;
 		let mut rgb_cfg = pio::Config::default();
 		rgb_cfg.use_program(&rgb_prg, &[]);
-		rgb_cfg.set_out_pins(&rgb_pins);
+		// rgb_cfg.set_out_pins(&rgb_pins);
+		// rgb_cfg.set_in_pins(&[]);
+		unsafe {
+			rgb_cfg.set_pins(pio::PinConfig {
+				in_base: 16,
+				out_base: 24,
+				out_count: 16,
+				set_base: 16,
+				set_count: 0,
+				sideset_base: 20,
+				sideset_count: 0,
+			})
+		};
 		// rgb_cfg.clock_divider = divider;
 		rgb_cfg.fifo_join = pio::FifoJoin::TxOnly;
 
