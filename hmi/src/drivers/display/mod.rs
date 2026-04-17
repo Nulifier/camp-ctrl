@@ -67,91 +67,26 @@ struct TimingEngine {
 	pub sm0: pio::StateMachine<'static, peripherals::PIO0, 0>,
 	pub sm1: pio::StateMachine<'static, peripherals::PIO0, 1>,
 
-	// pub common2: pio::Common<'static, peripherals::PIO1>,
-
-	// pub sm0b: pio::StateMachine<'static, peripherals::PIO1, 0>,
-	// pub sm1b: pio::StateMachine<'static, peripherals::PIO1, 1>,
-
-	// pub de_pin: pio::Pin<'static, peripherals::PIO1>,
 	pub vsync_pin: pio::Pin<'static, peripherals::PIO0>,
 	pub hsync_pin: pio::Pin<'static, peripherals::PIO0>,
 	pub pclk_pin: pio::Pin<'static, peripherals::PIO0>,
-	// pub b3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b7_pin: pio::Pin<'static, peripherals::PIO1>,
-
-	// pub g2_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g7_pin: pio::Pin<'static, peripherals::PIO1>,
-
-	// pub r3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r7_pin: pio::Pin<'static, peripherals::PIO1>,
 }
 
 impl TimingEngine {
 	pub fn new(r: DisplayTimingResources) -> Self {
 		let mut pio = Pio::new(r.pio_timing, Irqs);
-		let mut pio_rgb = Pio::new(r.pio_rgb, Irqs);
 
-		let de_pin = pio_rgb.common.make_pio_pin(r.lcd_de);
 		let vsync_pin = pio.common.make_pio_pin(r.lcd_vsync);
 		let hsync_pin = pio.common.make_pio_pin(r.lcd_hsync);
 		let pclk_pin = pio.common.make_pio_pin(r.lcd_pclk);
-
-		let b3_pin = pio_rgb.common.make_pio_pin(r.lcd_b3);
-		let b4_pin = pio_rgb.common.make_pio_pin(r.lcd_b4);
-		let b5_pin = pio_rgb.common.make_pio_pin(r.lcd_b5);
-		let b6_pin = pio_rgb.common.make_pio_pin(r.lcd_b6);
-		let b7_pin = pio_rgb.common.make_pio_pin(r.lcd_b7);
-
-		let g2_pin = pio_rgb.common.make_pio_pin(r.lcd_g2);
-		let g3_pin = pio_rgb.common.make_pio_pin(r.lcd_g3);
-		let g4_pin = pio_rgb.common.make_pio_pin(r.lcd_g4);
-		let g5_pin = pio_rgb.common.make_pio_pin(r.lcd_g5);
-		let g6_pin = pio_rgb.common.make_pio_pin(r.lcd_g6);
-		let g7_pin = pio_rgb.common.make_pio_pin(r.lcd_g7);
-
-		let r3_pin = pio_rgb.common.make_pio_pin(r.lcd_r3);
-		let r4_pin = pio_rgb.common.make_pio_pin(r.lcd_r4);
-		let r5_pin = pio_rgb.common.make_pio_pin(r.lcd_r5);
-		let r6_pin = pio_rgb.common.make_pio_pin(r.lcd_r6);
-		let r7_pin = pio_rgb.common.make_pio_pin(r.lcd_r7);
 
 		TimingEngine {
 			common: pio.common,
 			sm0: pio.sm0,
 			sm1: pio.sm1,
-			common2: pio_rgb.common,
-			sm0b: pio_rgb.sm0,
-			sm1b: pio_rgb.sm1,
-			de_pin,
 			vsync_pin,
 			hsync_pin,
 			pclk_pin,
-			b3_pin,
-			b4_pin,
-			b5_pin,
-			b6_pin,
-			b7_pin,
-			g2_pin,
-			g3_pin,
-			g4_pin,
-			g5_pin,
-			g6_pin,
-			g7_pin,
-			r3_pin,
-			r4_pin,
-			r5_pin,
-			r6_pin,
-			r7_pin,
 		}
 	}
 
@@ -190,6 +125,117 @@ impl TimingEngine {
 		self.sm1
 			.set_pin_dirs(pio::Direction::Out, &[&self.hsync_pin, &self.pclk_pin]);
 
+		// Pass the parameters to the PIO programs
+
+		// Pass the height to the VSYNC program
+		self.sm0.tx().push((DISPLAY_HEIGHT - 1) as u32);
+		// Pass the width to the HSYNC program
+		self.sm1.tx().push((DISPLAY_WIDTH - 1) as u32);
+
+		Ok(())
+	}
+
+	pub fn start(&mut self) -> Result<()> {
+		// Reset the state machine clock dividers
+		self.sm0.clkdiv_restart();
+		self.sm1.clkdiv_restart();
+
+		// Start the state machines
+		self.common.apply_sm_batch(|b| {
+			// Enable
+			b.set_enable(&mut self.sm0, true);
+			b.set_enable(&mut self.sm1, true);
+			// b.set_enable(&mut self.sm2, true);
+			// b.set_enable(&mut self.sm3, true);
+
+			// Restart
+			b.restart(&mut self.sm0);
+			b.restart(&mut self.sm1);
+			// b.restart(&mut self.sm2);
+			// b.restart(&mut self.sm3);
+		});
+
+		Ok(())
+	}
+}
+
+struct RgbEngine {
+	pub common2: pio::Common<'static, peripherals::PIO1>,
+
+	pub sm0b: pio::StateMachine<'static, peripherals::PIO1, 0>,
+	pub sm1b: pio::StateMachine<'static, peripherals::PIO1, 1>,
+
+	pub de_pin: pio::Pin<'static, peripherals::PIO1>,
+
+	pub b3_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub b4_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub b5_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub b6_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub b7_pin: pio::Pin<'static, peripherals::PIO1>,
+
+	pub g2_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub g3_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub g4_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub g5_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub g6_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub g7_pin: pio::Pin<'static, peripherals::PIO1>,
+
+	pub r3_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub r4_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub r5_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub r6_pin: pio::Pin<'static, peripherals::PIO1>,
+	pub r7_pin: pio::Pin<'static, peripherals::PIO1>,
+}
+
+impl RgbEngine {
+	pub fn new(r: DisplayDataResources) -> Self {
+		let mut pio_rgb = Pio::new(r.pio_rgb, Irqs);
+
+		let de_pin = pio_rgb.common.make_pio_pin(r.lcd_de);
+		let b3_pin = pio_rgb.common.make_pio_pin(r.lcd_b3);
+		let b4_pin = pio_rgb.common.make_pio_pin(r.lcd_b4);
+		let b5_pin = pio_rgb.common.make_pio_pin(r.lcd_b5);
+		let b6_pin = pio_rgb.common.make_pio_pin(r.lcd_b6);
+		let b7_pin = pio_rgb.common.make_pio_pin(r.lcd_b7);
+
+		let g2_pin = pio_rgb.common.make_pio_pin(r.lcd_g2);
+		let g3_pin = pio_rgb.common.make_pio_pin(r.lcd_g3);
+		let g4_pin = pio_rgb.common.make_pio_pin(r.lcd_g4);
+		let g5_pin = pio_rgb.common.make_pio_pin(r.lcd_g5);
+		let g6_pin = pio_rgb.common.make_pio_pin(r.lcd_g6);
+		let g7_pin = pio_rgb.common.make_pio_pin(r.lcd_g7);
+
+		let r3_pin = pio_rgb.common.make_pio_pin(r.lcd_r3);
+		let r4_pin = pio_rgb.common.make_pio_pin(r.lcd_r4);
+		let r5_pin = pio_rgb.common.make_pio_pin(r.lcd_r5);
+		let r6_pin = pio_rgb.common.make_pio_pin(r.lcd_r6);
+		let r7_pin = pio_rgb.common.make_pio_pin(r.lcd_r7);
+
+		RgbEngine {
+			common2: pio_rgb.common,
+			sm0b: pio_rgb.sm0,
+			sm1b: pio_rgb.sm1,
+			de_pin,
+			b3_pin,
+			b4_pin,
+			b5_pin,
+			b6_pin,
+			b7_pin,
+			g2_pin,
+			g3_pin,
+			g4_pin,
+			g5_pin,
+			g6_pin,
+			g7_pin,
+			r3_pin,
+			r4_pin,
+			r5_pin,
+			r6_pin,
+			r7_pin,
+		}
+	}
+
+	pub fn init(&mut self, _timing: &Timing) -> Result<()> {
 		// Load the PIO program for ouputting the DE signal
 		let de_prg = pio_progs::load_rgb_de_program(&mut self.common2)?;
 		let mut de_cfg = pio::Config::default();
@@ -232,10 +278,6 @@ impl TimingEngine {
 
 		// Pass the parameters to the PIO programs
 
-		// Pass the height to the VSYNC program
-		self.sm0.tx().push((DISPLAY_HEIGHT - 1) as u32);
-		// Pass the width to the HSYNC program
-		self.sm1.tx().push((DISPLAY_WIDTH - 1) as u32);
 		// Pass the height to the RGB_DE program
 		self.sm0b.tx().push((DISPLAY_HEIGHT - 1) as u32);
 		// Pass the width to the RGB program
@@ -248,25 +290,10 @@ impl TimingEngine {
 
 	pub fn start(&mut self) -> Result<()> {
 		// Reset the state machine clock dividers
-		self.sm0.clkdiv_restart();
-		self.sm1.clkdiv_restart();
 		self.sm0b.clkdiv_restart();
 		self.sm1b.clkdiv_restart();
+
 		// Start the state machines
-		self.common.apply_sm_batch(|b| {
-			// Enable
-			b.set_enable(&mut self.sm0, true);
-			b.set_enable(&mut self.sm1, true);
-			// b.set_enable(&mut self.sm2, true);
-			// b.set_enable(&mut self.sm3, true);
-
-			// Restart
-			b.restart(&mut self.sm0);
-			b.restart(&mut self.sm1);
-			// b.restart(&mut self.sm2);
-			// b.restart(&mut self.sm3);
-		});
-
 		self.common2.apply_sm_batch(|b| {
 			// Enable
 			b.set_enable(&mut self.sm0b, true);
@@ -281,39 +308,12 @@ impl TimingEngine {
 	}
 }
 
-struct RgbEngine {
-	// pub common2: pio::Common<'static, peripherals::PIO1>,
-
-	// pub sm0b: pio::StateMachine<'static, peripherals::PIO1, 0>,
-	// pub sm1b: pio::StateMachine<'static, peripherals::PIO1, 1>,
-
-	// pub de_pin: pio::Pin<'static, peripherals::PIO1>,
-
-	// pub b3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub b7_pin: pio::Pin<'static, peripherals::PIO1>,
-
-	// pub g2_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub g7_pin: pio::Pin<'static, peripherals::PIO1>,
-
-	// pub r3_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r4_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r5_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r6_pin: pio::Pin<'static, peripherals::PIO1>,
-	// pub r7_pin: pio::Pin<'static, peripherals::PIO1>,
-}
-
 pub struct DisplayDriver {
 	reset_pin: Output<'static>,
 
 	timing: Timing,
 	timing_engine: TimingEngine,
+	rgb_engine: RgbEngine,
 }
 
 impl DisplayDriver {
@@ -324,35 +324,20 @@ impl DisplayDriver {
 	) -> Self {
 		let reset_pin = Output::new(r_ctrl.lcd_rst, Level::Low);
 		let timing_engine = TimingEngine::new(r_timing);
-
-		// Set the RGB pins to output red for testing
-		// let _lcd_b3 = Output::new(r_data.lcd_b3, Level::Low);
-		// let _lcd_b4 = Output::new(r_data.lcd_b4, Level::Low);
-		// let _lcd_b5 = Output::new(r_data.lcd_b5, Level::Low);
-		// let _lcd_b6 = Output::new(r_data.lcd_b6, Level::Low);
-		// let _lcd_b7 = Output::new(r_data.lcd_b7, Level::Low);
-		// let _lcd_g2 = Output::new(r_data.lcd_g2, Level::Low);
-		// let _lcd_g3 = Output::new(r_data.lcd_g3, Level::Low);
-		// let _lcd_g4 = Output::new(r_data.lcd_g4, Level::Low);
-		// let _lcd_g5 = Output::new(r_data.lcd_g5, Level::Low);
-		// let _lcd_g6 = Output::new(r_data.lcd_g6, Level::Low);
-		// let _lcd_g7 = Output::new(r_data.lcd_g7, Level::Low);
-		// let _lcd_r3 = Output::new(r_data.lcd_r3, Level::High);
-		// let _lcd_r4 = Output::new(r_data.lcd_r4, Level::High);
-		// let _lcd_r5 = Output::new(r_data.lcd_r5, Level::High);
-		// let _lcd_r6 = Output::new(r_data.lcd_r6, Level::High);
-		// let _lcd_r7 = Output::new(r_data.lcd_r7, Level::High);
+		let rgb_engine = RgbEngine::new(r_data);
 
 		DisplayDriver {
 			reset_pin,
 			timing: Timing::default_st7262(),
 			timing_engine,
+			rgb_engine,
 		}
 	}
 
 	pub async fn initialize(&mut self) -> Result<()> {
 		self.reset().await;
 		self.timing_engine.init(&self.timing)?;
+		self.rgb_engine.init(&self.timing)?;
 
 		Ok(())
 	}
@@ -367,6 +352,8 @@ impl DisplayDriver {
 
 	pub fn start(&mut self) -> Result<()> {
 		self.timing_engine.start()?;
+		self.rgb_engine.start()?;
+
 		Ok(())
 	}
 }
