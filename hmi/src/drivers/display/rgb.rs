@@ -88,6 +88,11 @@ impl RgbEngine {
 		let de_prg = super::pio_progs::load_rgb_de_program(&mut self.common2)?;
 		let mut de_cfg = pio::Config::default();
 		de_cfg.use_program(&de_prg, &[&self.de_pin]);
+		let pins = de_cfg.get_pins();
+		info!(
+			"DE program pins: in_base={}, out_base={}, set_base={}, sideset_base={}, sideset_count={}",
+			pins.in_base, pins.out_base, pins.set_base, pins.sideset_base, pins.sideset_count
+		);
 		unsafe {
 			de_cfg.set_pins(pio::PinConfig {
 				in_base: 16,
@@ -128,8 +133,18 @@ impl RgbEngine {
 		let rgb_prg = super::pio_progs::load_rgb_program(&mut self.common2)?;
 		let mut rgb_cfg = pio::Config::default();
 		rgb_cfg.use_program(&rgb_prg, &[]);
-		// rgb_cfg.set_out_pins(&rgb_pins);
+		rgb_cfg.set_out_pins(&rgb_pins);
 		// rgb_cfg.set_in_pins(&[]);
+		let pins = rgb_cfg.get_pins();
+		info!(
+			"RGB program pins: in_base={}, out_base={}, out_count={}, set_base={}, sideset_base={}, sideset_count={}",
+			pins.in_base,
+			pins.out_base,
+			pins.out_count,
+			pins.set_base,
+			pins.sideset_base,
+			pins.sideset_count
+		);
 		unsafe {
 			rgb_cfg.set_pins(pio::PinConfig {
 				in_base: 16,
@@ -137,7 +152,7 @@ impl RgbEngine {
 				out_count: 16,
 				set_base: 16,
 				set_count: 0,
-				sideset_base: 20,
+				sideset_base: 0,
 				sideset_count: 0,
 			})
 		};

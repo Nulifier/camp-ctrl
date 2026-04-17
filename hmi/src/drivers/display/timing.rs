@@ -1,6 +1,8 @@
 use crate::board::DisplayTimingResources;
 use crate::drivers::display::PCLK_FREQUENCY;
 use crate::error::{Error, Result};
+use defmt::info;
+use embassy_rp::pio::PinConfig;
 use embassy_rp::{peripherals, pio};
 use fixed::types::U24F8;
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
@@ -47,34 +49,56 @@ impl TimingEngine {
 			return Err(Error::InvalidDisplayTiming);
 		}
 
-		// Load the PIO program for generating the VSYNC signal
-		let vsync_prg = super::pio_progs::load_vsync_program(&mut self.common)?;
-		let mut vsync_cfg = pio::Config::default();
-		vsync_cfg.use_program(&vsync_prg, &[&self.vsync_pin]);
-		vsync_cfg.fifo_join = pio::FifoJoin::TxOnly;
-		// vsync_cfg.clock_divider = divider;
-
-		self.sm0.set_config(&vsync_cfg);
-		self.sm0
-			.set_pin_dirs(pio::Direction::Out, &[&self.vsync_pin]);
-
 		// Load the PIO program for generating the HSYNC and PCLK signals
 		let hsync_prg = super::pio_progs::load_hsync_program(&mut self.common)?;
 		let mut hsync_cfg = pio::Config::default();
 		hsync_cfg.use_program(&hsync_prg, &[&self.hsync_pin, &self.pclk_pin]);
 		hsync_cfg.clock_divider = divider;
 		hsync_cfg.fifo_join = pio::FifoJoin::TxOnly;
+		unsafe {
+			hsync_cfg.set_pins(PinConfig {
+				in_base: 0,
+				out_base: 0,
+				out_count: 0,
+				set_base: 0,
+				set_count: 0,
+				sideset_base: 22, // HSYNC on bit0, PCLK on bit1
+				sideset_count: 2,
+			})
+		};
 
-		self.sm1.set_config(&hsync_cfg);
-		self.sm1
+		self.sm0.set_config(&hsync_cfg);
+		self.sm0
 			.set_pin_dirs(pio::Direction::Out, &[&self.hsync_pin, &self.pclk_pin]);
+
+		// Load the PIO program for generating the VSYNC signal
+		let vsync_prg = super::pio_progs::load_vsync_program(&mut self.common)?;
+		let mut vsync_cfg = pio::Config::default();
+		vsync_cfg.use_program(&vsync_prg, &[&self.vsync_pin]);
+		vsync_cfg.fifo_join = pio::FifoJoin::TxOnly;
+		// vsync_cfg.clock_divider = divider;
+		unsafe {
+			vsync_cfg.set_pins(PinConfig {
+				in_base: 0,
+				out_base: 0,
+				out_count: 0,
+				set_base: 0,
+				set_count: 0,
+				sideset_base: 21, // VSYNC on bit0
+				sideset_count: 1,
+			})
+		};
+
+		self.sm1.set_config(&vsync_cfg);
+		self.sm1
+			.set_pin_dirs(pio::Direction::Out, &[&self.vsync_pin]);
 
 		// Pass the parameters to the PIO programs
 
-		// Pass the height to the VSYNC program
-		self.sm0.tx().push((DISPLAY_HEIGHT - 1) as u32);
 		// Pass the width to the HSYNC program
-		self.sm1.tx().push((DISPLAY_WIDTH - 1) as u32);
+		self.sm0.tx().push((DISPLAY_WIDTH - 1) as u32);
+		// Pass the height to the VSYNC program
+		self.sm1.tx().push((DISPLAY_HEIGHT - 1) as u32);
 
 		Ok(())
 	}
