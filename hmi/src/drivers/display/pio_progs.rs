@@ -1,8 +1,5 @@
 use crate::error::Result;
-use embassy_rp::pio::{
-	self, Common, Instance,
-	program::{self, pio_asm, pio_file},
-};
+use embassy_rp::pio::{self, Common, Instance, program::pio_file};
 
 pub fn load_vsync_program<PIO: Instance>(
 	common: &mut Common<'static, PIO>,

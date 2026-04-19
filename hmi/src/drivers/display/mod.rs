@@ -54,6 +54,7 @@ impl DisplayDriver {
 			rgb_engine,
 			sram_buffer_0: [0; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES],
 			sram_buffer_1: [0; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES],
+			buffers: buffers::DoubleBuffers::new(),
 		}
 	}
 

@@ -1,5 +1,5 @@
+use crate::board::DisplayDataResources;
 use crate::error::Result;
-use crate::{board::DisplayDataResources, drivers::display::rgb};
 use defmt::info;
 use embassy_rp::{Peri, dma::Word, gpio, peripherals, pio};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
