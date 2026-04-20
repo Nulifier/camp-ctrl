@@ -47,6 +47,9 @@ assign_resources! {
 
 		dma: DMA_CH0,
 	}
+	display_fill: DisplayFillResources {
+		dma_fill: DMA_CH1,
+	}
 	backlight: BacklightResources {
 		lcd_en: PIN_45,
 		lcd_bl: PIN_44,

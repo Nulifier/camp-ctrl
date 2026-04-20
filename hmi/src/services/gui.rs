@@ -1,17 +1,17 @@
-use defmt::info;
-use embassy_time::{Duration, Timer};
-// use lvgl::display::LvDisplay;
-
 use crate::{
-	board::{DisplayCtrlResources, DisplayDataResources, DisplayTimingResources},
+	board::{
+		DisplayCtrlResources, DisplayDataResources, DisplayFillResources, DisplayTimingResources,
+	},
 	drivers::display::DisplayDriver,
 };
+use defmt::info;
 
 #[embassy_executor::task]
 pub async fn gui_task(
 	r_ctrl: DisplayCtrlResources,
 	r_timing: DisplayTimingResources,
 	r_data: DisplayDataResources,
+	r_fill: DisplayFillResources,
 ) -> ! {
 	info!("Starting GUI task");
 
@@ -19,7 +19,7 @@ pub async fn gui_task(
 	// let display = crate::gui::display::create_rp_display();
 	// display.set_default();
 
-	let mut disp = DisplayDriver::new(r_ctrl, r_timing, r_data);
+	let mut disp = DisplayDriver::new(r_ctrl, r_timing, r_data, r_fill);
 	disp.initialize().await.unwrap();
 
 	disp.start().unwrap();

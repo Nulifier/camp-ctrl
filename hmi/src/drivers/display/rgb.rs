@@ -1,7 +1,7 @@
 use crate::board::DisplayDataResources;
 use crate::error::Result;
 use defmt::info;
-use embassy_rp::{Peri, dma::Word, gpio, peripherals, pio};
+use embassy_rp::{Peri, gpio, peripherals, pio};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub(super) struct RgbEngine {
@@ -192,7 +192,7 @@ impl RgbEngine {
 		Ok(())
 	}
 
-	pub async fn push_test<W: Word>(&mut self, data: &[W]) -> Result<()> {
+	pub async fn send_chunk(&mut self, data: &[u16]) -> Result<()> {
 		self.sm1
 			.tx()
 			.dma_push(self.dma_channel.reborrow(), &data, false)

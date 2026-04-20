@@ -3,9 +3,10 @@
 
 use crate::board::{
 	AssignedResources, BacklightResources, DisplayCtrlResources, DisplayDataResources,
-	DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
+	DisplayFillResources, DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
 };
 use crate::services::backlight::{backlight_task, wake_screen};
+use crate::services::display::fill_task;
 use crate::services::gui::gui_task;
 use core::mem::MaybeUninit;
 use core::ptr::addr_of_mut;
@@ -68,14 +69,6 @@ async fn dimmer() {
 	}
 }
 
-#[embassy_executor::task]
-async fn do_stuff() {
-	loop {
-		info!("Doing stuff...");
-		embassy_time::Timer::after(embassy_time::Duration::from_secs(5)).await;
-	}
-}
-
 #[interrupt]
 unsafe fn SWI_IRQ_0() {
 	unsafe { EXECUTOR1_HIGH.on_interrupt() };
@@ -104,14 +97,19 @@ fn main() -> ! {
 			// Setup the executor for core 1 to run higher priority tasks
 			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
 			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			unwrap!(spawner1_high.spawn(do_stuff()));
+			unwrap!(spawner1_high.spawn(fill_task()));
 
 			// Run the GUI on core 1 at lower priority
 			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
-			executor1_gui.run(|_spawner| {
+			executor1_gui.run(|spawner1_low| {
 				//////////////////////////////////////////////////////////////
 				// Core1: UI and related tasks
-				unwrap!(_spawner.spawn(gui_task(r.display_ctrl, r.display_timing, r.display_data)));
+				unwrap!(spawner1_low.spawn(gui_task(
+					r.display_ctrl,
+					r.display_timing,
+					r.display_data,
+					r.display_fill
+				)));
 			})
 		},
 	);

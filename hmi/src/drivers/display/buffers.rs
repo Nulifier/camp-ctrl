@@ -26,6 +26,13 @@ impl<const N: usize, T> DoubleBuffers<N, T> {
 		}
 	}
 
+	pub unsafe fn active_slice_mut(&mut self) -> &mut [T] {
+		match self.active {
+			0 => self.fb0.as_mut(),
+			_ => self.fb1.as_mut(),
+		}
+	}
+
 	pub fn back_ptr(&self) -> *const T {
 		match self.active {
 			0 => self.fb1.as_ptr(),
@@ -37,6 +44,13 @@ impl<const N: usize, T> DoubleBuffers<N, T> {
 		match self.active {
 			0 => self.fb1.as_mut_ptr(),
 			_ => self.fb0.as_mut_ptr(),
+		}
+	}
+
+	pub fn back_slice_mut(&mut self) -> &mut [T] {
+		match self.active {
+			0 => self.fb1.as_mut(),
+			_ => self.fb0.as_mut(),
 		}
 	}
 
