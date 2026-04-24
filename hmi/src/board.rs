@@ -1,5 +1,12 @@
 use assign_resources::assign_resources;
-use embassy_rp::{Peri, peripherals};
+use embassy_rp::{Peri, bind_interrupts, dma, i2c, peripherals, pio};
+
+bind_interrupts!(pub(crate) struct Irqs {
+	I2C1_IRQ => i2c::InterruptHandler<peripherals::I2C1>;
+	PIO0_IRQ_0 => pio::InterruptHandler<peripherals::PIO0>;
+	PIO1_IRQ_0 => pio::InterruptHandler<peripherals::PIO1>;
+	DMA_IRQ_0 => dma::InterruptHandler<peripherals::DMA_CH12>;
+});
 
 assign_resources! {
 	psram: PsramResources {
@@ -45,10 +52,13 @@ assign_resources! {
 
 		pio_rgb: PIO1,
 
-		dma: DMA_CH0,
+		dma_a: DMA_CH12,
+		dma_b: DMA_CH13,
+		dma_c: DMA_CH14,
+		dma_d: DMA_CH15,
 	}
 	display_fill: DisplayFillResources {
-		dma_fill: DMA_CH1,
+		dma_fill: DMA_CH0,
 	}
 	backlight: BacklightResources {
 		lcd_en: PIN_45,

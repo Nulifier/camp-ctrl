@@ -1,15 +1,15 @@
-use embassy_rp::{Peri, peripherals};
+use embassy_rp::dma;
 
 use crate::board::DisplayFillResources;
 
 pub(crate) struct FillEngine {
-	pub dma_channel: Peri<'static, peripherals::DMA_CH1>,
+	// pub dma_channel: dma::Channel<'static>,
 }
 
 impl FillEngine {
 	pub fn new(r: DisplayFillResources) -> Self {
 		FillEngine {
-			dma_channel: r.dma_fill,
+			// dma_channel: dma::Channel::new(r.dma_fill, crate::board::Irqs),
 		}
 	}
 }

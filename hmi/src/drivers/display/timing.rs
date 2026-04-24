@@ -1,7 +1,7 @@
 use crate::board::DisplayTimingResources;
 use crate::drivers::display::PCLK_FREQUENCY;
 use crate::error::{Error, Result};
-use embassy_rp::pio::PinConfig;
+use embassy_rp::pio::{PinConfig, PioBatch};
 use embassy_rp::{peripherals, pio};
 use fixed::types::U24F8;
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
@@ -19,7 +19,7 @@ pub(super) struct TimingEngine {
 
 impl TimingEngine {
 	pub fn new(r: DisplayTimingResources) -> Self {
-		let mut pio = pio::Pio::new(r.pio_timing, super::Irqs);
+		let mut pio = pio::Pio::new(r.pio_timing, crate::board::Irqs);
 
 		let vsync_pin = pio.common.make_pio_pin(r.lcd_vsync);
 		let hsync_pin = pio.common.make_pio_pin(r.lcd_hsync);
@@ -108,15 +108,16 @@ impl TimingEngine {
 		self.sm1.clkdiv_restart();
 
 		// Start the state machines
-		self.common.apply_sm_batch(|b| {
-			// Enable
-			b.set_enable(&mut self.sm0, true);
-			b.set_enable(&mut self.sm1, true);
+		{
+			let mut batch = PioBatch::new();
+			batch.set_enable(&mut self.sm0, true);
+			batch.set_enable(&mut self.sm1, true);
 
-			// Restart
-			b.restart(&mut self.sm0);
-			b.restart(&mut self.sm1);
-		});
+			batch.restart(&mut self.sm0);
+			batch.restart(&mut self.sm1);
+
+			batch.execute();
+		}
 
 		Ok(())
 	}

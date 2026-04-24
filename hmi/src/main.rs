@@ -5,15 +5,15 @@ use crate::board::{
 	AssignedResources, BacklightResources, DisplayCtrlResources, DisplayDataResources,
 	DisplayFillResources, DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
 };
+use crate::drivers::display::spawn_display_tasks;
 use crate::services::backlight::{backlight_task, wake_screen};
-use crate::services::display::fill_task;
 use crate::services::gui::gui_task;
 use core::mem::MaybeUninit;
 use core::ptr::addr_of_mut;
 use defmt::{info, unwrap};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::{Executor, InterruptExecutor};
 use embassy_rp::block::ImageDef;
+use embassy_rp::executor::{Executor, InterruptExecutor};
 use embassy_rp::interrupt::InterruptExt;
 use embassy_rp::multicore::{Stack, spawn_core1};
 use embassy_rp::{self as hal, interrupt};
@@ -45,7 +45,7 @@ static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1_HIGH: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR1_GUI: StaticCell<Executor> = StaticCell::new();
 
-const HEAP_SIZE: usize = 16 * 1024; // 16 KB
+const HEAP_SIZE: usize = 16 * 1024 * 10; // 16 KB
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
@@ -97,19 +97,20 @@ fn main() -> ! {
 			// Setup the executor for core 1 to run higher priority tasks
 			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
 			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			unwrap!(spawner1_high.spawn(fill_task()));
+			spawn_display_tasks(
+				&spawner1_high,
+				r.display_ctrl,
+				r.display_timing,
+				r.display_data,
+				r.display_fill,
+			);
 
 			// Run the GUI on core 1 at lower priority
 			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
 			executor1_gui.run(|spawner1_low| {
 				//////////////////////////////////////////////////////////////
 				// Core1: UI and related tasks
-				unwrap!(spawner1_low.spawn(gui_task(
-					r.display_ctrl,
-					r.display_timing,
-					r.display_data,
-					r.display_fill
-				)));
+				spawner1_low.spawn(unwrap!(gui_task()));
 			})
 		},
 	);
@@ -121,19 +122,17 @@ fn main() -> ! {
 
 		let i2c = i2c::init(r.i2c1);
 
-		unwrap!(spawner.spawn(backlight_task(r.backlight)));
+		spawner.spawn(unwrap!(backlight_task(r.backlight)));
 
-		spawner
-			.spawn(services::touch_task::touch_task(
-				// r.touch.tp_rst.into(),
-				// r.touch.tp_int.into(),
-				I2cDevice::new(i2c),
-				r.touch,
-			))
-			.unwrap();
+		spawner.spawn(unwrap!(services::touch_task::touch_task(
+			// r.touch.tp_rst.into(),
+			// r.touch.tp_int.into(),
+			I2cDevice::new(i2c),
+			r.touch,
+		)));
 
-		spawner.spawn(dimmer()).unwrap();
-		spawner.spawn(wake_screen()).unwrap();
+		spawner.spawn(unwrap!(dimmer()));
+		spawner.spawn(unwrap!(wake_screen()));
 	});
 }
 

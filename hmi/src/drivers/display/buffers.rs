@@ -26,6 +26,13 @@ impl<const N: usize, T> DoubleBuffers<N, T> {
 		}
 	}
 
+	pub fn active_slice(&self) -> &[T] {
+		match self.active {
+			0 => self.fb0.as_ref(),
+			_ => self.fb1.as_ref(),
+		}
+	}
+
 	pub unsafe fn active_slice_mut(&mut self) -> &mut [T] {
 		match self.active {
 			0 => self.fb0.as_mut(),

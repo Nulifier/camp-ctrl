@@ -1,11 +1,14 @@
 use crate::board::DisplayDataResources;
 use crate::error::Result;
 use defmt::info;
-use embassy_rp::{Peri, gpio, peripherals, pio};
+use embassy_rp::{
+	dma, gpio, peripherals,
+	pio::{self, PioBatch},
+};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub(super) struct RgbEngine {
-	pub common2: pio::Common<'static, peripherals::PIO1>,
+	pub common: pio::Common<'static, peripherals::PIO1>,
 
 	pub sm0: pio::StateMachine<'static, peripherals::PIO1, 0>,
 	pub sm1: pio::StateMachine<'static, peripherals::PIO1, 1>,
@@ -31,12 +34,13 @@ pub(super) struct RgbEngine {
 	pub r6_pin: pio::Pin<'static, peripherals::PIO1>,
 	pub r7_pin: pio::Pin<'static, peripherals::PIO1>,
 
-	pub dma_channel: Peri<'static, peripherals::DMA_CH0>,
+	pub dma_channel_a: dma::Channel<'static>,
+	// pub dma_channel_b: dma::Channel<'static>,
 }
 
 impl RgbEngine {
 	pub fn new(r: DisplayDataResources) -> Self {
-		let mut pio_rgb = pio::Pio::new(r.pio_rgb, super::Irqs);
+		let mut pio_rgb = pio::Pio::new(r.pio_rgb, crate::board::Irqs);
 
 		let de_pin = pio_rgb.common.make_pio_pin(r.lcd_de);
 		let b3_pin = pio_rgb.common.make_pio_pin(r.lcd_b3);
@@ -59,7 +63,7 @@ impl RgbEngine {
 		let r7_pin = pio_rgb.common.make_pio_pin(r.lcd_r7);
 
 		RgbEngine {
-			common2: pio_rgb.common,
+			common: pio_rgb.common,
 			sm0: pio_rgb.sm0,
 			sm1: pio_rgb.sm1,
 			de_pin,
@@ -79,20 +83,17 @@ impl RgbEngine {
 			r5_pin,
 			r6_pin,
 			r7_pin,
-			dma_channel: r.dma,
+			dma_channel_a: dma::Channel::new(r.dma_a, crate::board::Irqs),
+			// dma_channel_b: dma::Channel::new(r.dma_b, crate::board::Irqs),
 		}
 	}
 
 	pub fn init(&mut self) -> Result<()> {
 		// Load the PIO program for ouputting the DE signal
-		let de_prg = super::pio_progs::load_rgb_de_program(&mut self.common2)?;
+		let de_prg = super::pio_progs::load_rgb_de_program(&mut self.common)?;
 		let mut de_cfg = pio::Config::default();
 		de_cfg.use_program(&de_prg, &[&self.de_pin]);
-		let pins = de_cfg.get_pins();
-		info!(
-			"DE program pins: in_base={}, out_base={}, set_base={}, sideset_base={}, sideset_count={}",
-			pins.in_base, pins.out_base, pins.set_base, pins.sideset_base, pins.sideset_count
-		);
+
 		unsafe {
 			de_cfg.set_pins(pio::PinConfig {
 				in_base: 16,
@@ -130,21 +131,11 @@ impl RgbEngine {
 			&self.r6_pin,
 			&self.r7_pin,
 		];
-		let rgb_prg = super::pio_progs::load_rgb_program(&mut self.common2)?;
+		let rgb_prg = super::pio_progs::load_rgb_program(&mut self.common)?;
 		let mut rgb_cfg = pio::Config::default();
 		rgb_cfg.use_program(&rgb_prg, &[]);
 		rgb_cfg.set_out_pins(&rgb_pins);
-		// rgb_cfg.set_in_pins(&[]);
-		let pins = rgb_cfg.get_pins();
-		info!(
-			"RGB program pins: in_base={}, out_base={}, out_count={}, set_base={}, sideset_base={}, sideset_count={}",
-			pins.in_base,
-			pins.out_base,
-			pins.out_count,
-			pins.set_base,
-			pins.sideset_base,
-			pins.sideset_count
-		);
+
 		unsafe {
 			rgb_cfg.set_pins(pio::PinConfig {
 				in_base: 16,
@@ -179,23 +170,24 @@ impl RgbEngine {
 		self.sm1.clkdiv_restart();
 
 		// Start the state machines
-		self.common2.apply_sm_batch(|b| {
-			// Enable
-			b.set_enable(&mut self.sm0, true);
-			b.set_enable(&mut self.sm1, true);
+		{
+			let mut batch = PioBatch::new();
+			batch.set_enable(&mut self.sm0, true);
+			batch.set_enable(&mut self.sm1, true);
 
-			// Restart
-			b.restart(&mut self.sm0);
-			b.restart(&mut self.sm1);
-		});
+			batch.restart(&mut self.sm0);
+			batch.restart(&mut self.sm1);
+
+			batch.execute();
+		}
 
 		Ok(())
 	}
 
-	pub async fn send_chunk(&mut self, data: &[u16]) -> Result<()> {
+	pub async fn flush_chunk(&mut self, data: &[u16]) -> Result<()> {
 		self.sm1
 			.tx()
-			.dma_push(self.dma_channel.reborrow(), &data, false)
+			.dma_push(&mut self.dma_channel_a, &data, false)
 			.await;
 
 		Ok(())
