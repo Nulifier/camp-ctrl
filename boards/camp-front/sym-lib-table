@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "camp-front") (type "KiCad") (uri "${KIPRJMOD}/camp-front.kicad_sym") (options "") (descr ""))
+)

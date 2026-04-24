@@ -1,0 +1,22 @@
+# Temporary files
+*.000
+*.bak
+*.bck
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*-backups
+*-cache
+*-bak
+*-bak*
+*~
+~*
+_autosave-*
+
+# Local project settings
+*.kicad_prl
+
+# Local git-based history (KiCad 9.0+)
+.history
+
+# Fabrication files
+fab/
