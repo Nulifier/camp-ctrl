@@ -52,10 +52,8 @@ assign_resources! {
 
 		pio_rgb: PIO1,
 
-		dma_a: DMA_CH12,
-		dma_b: DMA_CH13,
-		dma_c: DMA_CH14,
-		dma_d: DMA_CH15,
+		dma_pixels: DMA_CH14,
+		dma_ctrl: DMA_CH15,
 
 		// Uses DMA IRQ3
 	}

@@ -7,6 +7,7 @@ use static_cell::{ConstStaticCell, StaticCell};
 const SRAM_BUFFER_LINES: usize = 8;
 
 /// Number of chunk buffers to use. Must be at least 2 to allow double buffering
+/// WARNING: If this is changed, then make sure to update the DMA ring alignment in rgb.rs
 pub(super) const SRAM_BUFFER_COUNT: usize = 4;
 
 pub(super) const CHUNK_PIXELS: usize = DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES;

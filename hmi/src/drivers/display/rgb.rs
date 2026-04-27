@@ -1,7 +1,7 @@
 use crate::board::DisplayDataResources;
 use crate::drivers::display::FREE_CHUNKS;
 use crate::error::Result;
-use defmt::info;
+use defmt::assert_eq;
 use embassy_rp::{Peri, interrupt};
 use embassy_rp::{
 	gpio, peripherals,
@@ -11,22 +11,26 @@ use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use rp_pac as pac;
 use rp_pac::dma::regs::CtrlTrig;
 
-const DMA_CH_A: usize = 12;
-const DMA_CH_B: usize = 13;
-const DMA_CH_C: usize = 14;
-const DMA_CH_D: usize = 15;
+// This alignment makes sure that we can read the chunk ptrs in a ring buffer as it needs to be
+// a round binary value for the wrapping to work correctly.
+#[repr(align(16))]
+struct AlignedChunkPtrRing([*const u16; super::chunks::SRAM_BUFFER_COUNT]);
 
-const DMA_CH_A_MASK: u32 = 1 << DMA_CH_A;
-const DMA_CH_B_MASK: u32 = 1 << DMA_CH_B;
-const DMA_CH_C_MASK: u32 = 1 << DMA_CH_C;
-const DMA_CH_D_MASK: u32 = 1 << DMA_CH_D;
+const CHUNK_RING_ALIGNMENT: usize =
+	core::mem::size_of::<*const u16>() * super::chunks::SRAM_BUFFER_COUNT;
 
-const DMA_CH_ALL_MASK: u32 = (1 << DMA_CH_A) | (1 << DMA_CH_B) | (1 << DMA_CH_C) | (1 << DMA_CH_D);
+/// How many bits are needed to represent the chunk ring size, used for configuring the DMA ring buffer
+const CHUNK_RING_BITS: u8 = CHUNK_RING_ALIGNMENT.ilog2() as u8;
 
-static mut CHUNK_A_PTR: *const u16 = core::ptr::null();
-static mut CHUNK_B_PTR: *const u16 = core::ptr::null();
-static mut CHUNK_C_PTR: *const u16 = core::ptr::null();
-static mut CHUNK_D_PTR: *const u16 = core::ptr::null();
+static mut CHUNK_PTR_RING: AlignedChunkPtrRing =
+	AlignedChunkPtrRing([core::ptr::null(); super::chunks::SRAM_BUFFER_COUNT]);
+
+const DMA_PIXELS: usize = 14;
+const DMA_CTRL: usize = 15;
+
+const DMA_PIXELS_MASK: u32 = 1 << DMA_PIXELS;
+
+const DMA_IRQ_NUM: usize = 3;
 
 pub(super) struct RgbEngine {
 	pub common: pio::Common<'static, peripherals::PIO1>,
@@ -57,13 +61,9 @@ pub(super) struct RgbEngine {
 
 	// We just hold references to the DMA channels here as we're doing this using the PAC
 	#[allow(dead_code)]
-	pub dma_channel_a: Peri<'static, peripherals::DMA_CH12>,
+	pub dma_channel_pixels: Peri<'static, peripherals::DMA_CH14>,
 	#[allow(dead_code)]
-	pub dma_channel_b: Peri<'static, peripherals::DMA_CH13>,
-	#[allow(dead_code)]
-	pub dma_channel_c: Peri<'static, peripherals::DMA_CH14>,
-	#[allow(dead_code)]
-	pub dma_channel_d: Peri<'static, peripherals::DMA_CH15>,
+	pub dma_channel_ctrl: Peri<'static, peripherals::DMA_CH15>,
 }
 
 impl RgbEngine {
@@ -111,14 +111,12 @@ impl RgbEngine {
 			r5_pin,
 			r6_pin,
 			r7_pin,
-			dma_channel_a: r.dma_a,
-			dma_channel_b: r.dma_b,
-			dma_channel_c: r.dma_c,
-			dma_channel_d: r.dma_d,
+			dma_channel_pixels: r.dma_pixels,
+			dma_channel_ctrl: r.dma_ctrl,
 		}
 	}
 
-	pub fn init(&mut self) -> Result<()> {
+	pub fn init(&mut self, bufs: [*const u16; super::chunks::SRAM_BUFFER_COUNT]) -> Result<()> {
 		// Load the PIO program for ouputting the DE signal
 		let de_prg = super::pio_progs::load_rgb_de_program(&mut self.common)?;
 		let mut de_cfg = pio::Config::default();
@@ -196,10 +194,15 @@ impl RgbEngine {
 			cortex_m::peripheral::NVIC::unmask(pac::Interrupt::DMA_IRQ_3);
 		}
 
+		self.init_dma_ring(bufs);
+
 		Ok(())
 	}
 
 	pub fn start(&mut self) -> Result<()> {
+		// Start the DMA ring so pixel data is available when the PIO starts
+		self.start_dma_ring();
+
 		// Reset the state machine clock dividers
 		self.sm0.clkdiv_restart();
 		self.sm1.clkdiv_restart();
@@ -219,11 +222,25 @@ impl RgbEngine {
 		Ok(())
 	}
 
-	pub fn start_dma_ring(&mut self, bufs: [*const u16; super::chunks::SRAM_BUFFER_COUNT]) {
+	fn init_dma_ring(&mut self, bufs: [*const u16; super::chunks::SRAM_BUFFER_COUNT]) {
 		let pio = pac::PIO1;
+
+		assert_eq!(
+			CHUNK_RING_ALIGNMENT,
+			core::mem::align_of::<AlignedChunkPtrRing>(),
+			"Chunk pointer ring alignment does not match expected value"
+		);
+
+		// Update the global chunk pointer ring that the DMA channels will read from
+		// We start at 1 as the first chunk is already being processed by the DMA when this function
+		// is called, so the next chunk to process will be at index 1
+		unsafe { CHUNK_PTR_RING.0 = [bufs[1], bufs[2], bufs[3], bufs[0]] };
 
 		// Get PIO1 SM1 TX FIFO address
 		let tx_fifo_addr = pio.txf(1).as_ptr() as u32;
+		let dma_al3_read_addr_ptr = pac::DMA.ch(DMA_PIXELS).al3_read_addr_trig().as_ptr() as u32;
+		// This is safe because the DMA engine will only read from this address, and we won't modify it after this function
+		let chunk_ptr_ring_ptr = unsafe { &raw mut CHUNK_PTR_RING.0 as *const *const u16 };
 
 		// DREQ:
 		// PIO0 TX0..TX3 = DREQ 0..3
@@ -231,71 +248,34 @@ impl RgbEngine {
 		// PIO2 TX0..TX3 = DREQ 16..19
 		const DREQ: pac::dma::vals::TreqSel = pac::dma::vals::TreqSel::PIO1_TX1; // PIO1 TX1
 
-		// REMOVE AFTER TESTING
-		info!(
-			"Setting up DMA ring with buffers at: {:#010x}, {:#010x}, {:#010x}, {:#010x}",
-			bufs[0] as u32, bufs[1] as u32, bufs[2] as u32, bufs[3] as u32
-		);
 		unsafe {
-			CHUNK_A_PTR = bufs[0];
-			CHUNK_B_PTR = bufs[1];
-			CHUNK_C_PTR = bufs[2];
-			CHUNK_D_PTR = bufs[3];
-		};
-
-		info!("Configuring DMA channels for RGB output");
-		unsafe {
-			Self::configure_dma_channel(
-				DMA_CH_A,
+			Self::configure_pixel_dma(
+				DMA_PIXELS,
 				bufs[0],
 				tx_fifo_addr,
 				super::chunks::CHUNK_PIXELS as u32,
 				DREQ,
-				DMA_CH_B,
+				DMA_CTRL,
 			);
-			Self::debug_one("DMA_CH_A", DMA_CH_A);
-			Self::configure_dma_channel(
-				DMA_CH_B,
-				bufs[1],
-				tx_fifo_addr,
-				super::chunks::CHUNK_PIXELS as u32,
-				DREQ,
-				DMA_CH_C,
-			);
-			Self::debug_one("DMA_CH_B", DMA_CH_B);
-			Self::configure_dma_channel(
-				DMA_CH_C,
-				bufs[2],
-				tx_fifo_addr,
-				super::chunks::CHUNK_PIXELS as u32,
-				DREQ,
-				DMA_CH_D,
-			);
-			Self::debug_one("DMA_CH_C", DMA_CH_C);
-			Self::configure_dma_channel(
-				DMA_CH_D,
-				bufs[3],
-				tx_fifo_addr,
-				super::chunks::CHUNK_PIXELS as u32,
-				DREQ,
-				DMA_CH_A,
-			);
-			Self::debug_one("DMA_CH_D", DMA_CH_D);
+
+			Self::configure_ctrl_dma(DMA_CTRL, chunk_ptr_ring_ptr, dma_al3_read_addr_ptr);
 		}
 
 		// Clear stale interrupt flags
-		pac::DMA.ints(3).write_value(DMA_CH_ALL_MASK);
+		pac::DMA.ints(DMA_IRQ_NUM).write_value(DMA_PIXELS_MASK);
 
-		// Enable interrupts for the DMA channels
-		pac::DMA.inte(3).write_value(DMA_CH_ALL_MASK);
+		// Only pixel DMA needs an IRQ to signal that a chunk has been completed and its buffer is free
+		pac::DMA.inte(DMA_IRQ_NUM).write_value(DMA_PIXELS_MASK);
+	}
 
-		// Start only the first channel, the rest will be started by chaining
-		pac::DMA.ch(DMA_CH_A).ctrl_trig().modify(|w| {
+	fn start_dma_ring(&mut self) {
+		// Start first pixel transfer
+		pac::DMA.ch(DMA_PIXELS).ctrl_trig().modify(|w| {
 			w.set_en(true);
 		});
 	}
 
-	unsafe fn configure_dma_channel(
+	unsafe fn configure_pixel_dma(
 		ch_num: usize,
 		read_addr: *const u16,
 		write_addr: u32,
@@ -316,144 +296,89 @@ impl RgbEngine {
 			w.set_count(transfer_count);
 		});
 
-		let ctrl = {
-			let mut ctrl = CtrlTrig::default();
+		let mut ctrl = CtrlTrig::default();
 
-			// Enable the channel, but this won't trigger it as we're using a non-triggering alias
-			ctrl.set_en(true);
-
-			// Schedule over low priority channels
-			ctrl.set_high_priority(true);
-
-			// 16 bits per pixel (RGB565)
-			ctrl.set_data_size(pac::dma::vals::DataSize::SIZE_HALFWORD);
-
-			// Walk through chunk buffer
-			ctrl.set_incr_read(true);
-
-			// Always write to the same PIO FIFO address
-			ctrl.set_incr_write(false);
-
-			// Start next DMA channel when this one finishes
-			ctrl.set_chain_to(chain_to as u8);
-
-			// Pace from PIO TX FIFO DREQ
-			ctrl.set_treq_sel(dreq);
-
-			// Generate interrupt at end of each chunk
-			ctrl.set_irq_quiet(false);
-
-			ctrl
-		};
+		// Enable the channel, but this won't trigger it as we're using a non-triggering alias
+		// TODO: Can probably set this to false and just trigger the channel manually
+		ctrl.set_en(true);
+		ctrl.set_high_priority(true);
+		// 16 bits per pixel (RGB565)
+		ctrl.set_data_size(pac::dma::vals::DataSize::SIZE_HALFWORD);
+		// Walk through chunk buffer
+		ctrl.set_incr_read(true);
+		// Always write to the same PIO FIFO address
+		ctrl.set_incr_write(false);
+		// Start next DMA channel when this one finishes
+		ctrl.set_chain_to(chain_to as u8);
+		// Pace from PIO TX FIFO DREQ
+		ctrl.set_treq_sel(dreq);
+		// Generate interrupt at end of each chunk
+		ctrl.set_irq_quiet(false);
 
 		// Use non-triggering alias
 		ch.al1_ctrl().write_value(ctrl.0);
 	}
 
-	pub fn print_debug() {
-		info!("Debug -----------------");
-		Self::debug_one("DMA_CH_A", DMA_CH_A);
-		Self::debug_one("DMA_CH_B", DMA_CH_B);
-		Self::debug_one("DMA_CH_C", DMA_CH_C);
-		Self::debug_one("DMA_CH_D", DMA_CH_D);
-		Self::debug_pio();
-	}
-
-	fn debug_one(name: &'static str, ch_num: usize) {
+	unsafe fn configure_ctrl_dma(ch_num: usize, read_addr: *const *const u16, write_addr: u32) {
 		let ch = pac::DMA.ch(ch_num);
-		let ctrl = ch.ctrl_trig().read();
 
-		info!(
-			"{}({}) en={} busy={} count={} next_count={} dreq_count={} write_err={} read_err={}  chain_to={} treq_sel={} read_addr={:#010x} write_addr={:#010x}",
-			name,
-			ch_num,
-			ctrl.en(),
-			ctrl.busy(),
-			ch.trans_count().read().count(),
-			ch.dbg_tcr().read(),
-			ch.dbg_ctdreq().read().0,
-			ctrl.write_error(),
-			ctrl.read_error(),
-			ctrl.chain_to(),
-			ctrl.treq_sel(),
-			ch.read_addr().read(),
-			ch.write_addr().read(),
-		);
-	}
+		// Disable the channel before configuring
+		ch.ctrl_trig().modify(|w| {
+			w.set_en(false);
+		});
 
-	fn debug_pio() {
-		let fstat = pac::PIO1.fstat().read();
-		let fdebug = pac::PIO1.fdebug().read();
-		let sm1_addr = pac::PIO1.sm(1).addr().read();
+		ch.read_addr().write_value(read_addr as u32);
+		ch.write_addr().write_value(write_addr);
+		ch.trans_count().write(|w| {
+			w.set_count(1);
+		});
 
-		info!(
-			"PIO1 fstat={=u32:#010x} fdebug={=u32:#010x} sm1_pc={}",
-			fstat.0, fdebug.0, sm1_addr
-		);
+		let mut ctrl = CtrlTrig::default();
+
+		// Enable the channel, but this won't trigger it as we're using a non-triggering alias
+		ctrl.set_en(true);
+		ctrl.set_high_priority(true);
+		// Copy one 32-bit address per transfer
+		ctrl.set_data_size(pac::dma::vals::DataSize::SIZE_WORD);
+		// Walk through the 4-element pointer ring buffer
+		ctrl.set_incr_read(true);
+		// Always write to the same control register
+		ctrl.set_incr_write(false);
+		ctrl.set_ring_size(CHUNK_RING_BITS); // 2^4 = 16, so the read address will wrap around after 4 transfers
+		ctrl.set_ring_sel(false); // Apply the ring buffer to the read address
+		// Do not chain, writing this channel's value disables chaining
+		ctrl.set_chain_to(ch_num as u8);
+		// No pacing, this should run immediately after the pixel DMA channel triggers it
+		ctrl.set_treq_sel(pac::dma::vals::TreqSel::PERMANENT);
+		// No IRQ needed from control channel
+		ctrl.set_irq_quiet(true);
+
+		ch.al1_ctrl().write_value(ctrl.0);
 	}
 }
 
+/// Tracks what which is the next chunk to be completed by the DMA
+static DMA_COMPLETED_CHUNK: core::sync::atomic::AtomicUsize =
+	core::sync::atomic::AtomicUsize::new(0);
+
 #[interrupt]
 fn DMA_IRQ_3() {
-	let pending = pac::DMA.ints(3).read();
+	const MAX_CHUNK_INDEX: usize = super::chunks::SRAM_BUFFER_COUNT - 1;
 
-	// Check Channel 12 (DMA_CH_A)
-	if pending & DMA_CH_A_MASK != 0 {
+	let pending = pac::DMA.ints(DMA_IRQ_NUM).read();
+
+	if pending & DMA_PIXELS_MASK != 0 {
 		// Clear the interrupt flag
-		pac::DMA.ints(3).write_value(DMA_CH_A_MASK);
+		pac::DMA.ints(3).write_value(DMA_PIXELS_MASK);
+
+		let idx = DMA_COMPLETED_CHUNK.load(core::sync::atomic::Ordering::Relaxed);
 
 		// Signal free chunk
-		FREE_CHUNKS.try_send(0).ok();
+		FREE_CHUNKS.try_send(idx).ok();
 
-		// Reset the read address
-		pac::DMA
-			.ch(DMA_CH_A)
-			.read_addr()
-			.write_value(unsafe { CHUNK_A_PTR } as u32);
-	}
-
-	// Check Channel 13 (DMA_CH_B)
-	if pending & DMA_CH_B_MASK != 0 {
-		// Clear the interrupt flag
-		pac::DMA.ints(3).write_value(DMA_CH_B_MASK);
-
-		// Signal free chunk
-		FREE_CHUNKS.try_send(1).ok();
-
-		// Reset the read address
-		pac::DMA
-			.ch(DMA_CH_B)
-			.read_addr()
-			.write_value(unsafe { CHUNK_B_PTR } as u32);
-	}
-
-	// Check Channel 14 (DMA_CH_C)
-	if pending & DMA_CH_C_MASK != 0 {
-		// Clear the interrupt flag
-		pac::DMA.ints(3).write_value(DMA_CH_C_MASK);
-
-		// Signal free chunk
-		FREE_CHUNKS.try_send(2).ok();
-
-		// Reset the read address
-		pac::DMA
-			.ch(DMA_CH_C)
-			.read_addr()
-			.write_value(unsafe { CHUNK_C_PTR } as u32);
-	}
-
-	// Check Channel 15 (DMA_CH_D)
-	if pending & DMA_CH_D_MASK != 0 {
-		// Clear the interrupt flag
-		pac::DMA.ints(3).write_value(DMA_CH_D_MASK);
-
-		// Signal free chunk
-		FREE_CHUNKS.try_send(3).ok();
-
-		// Reset the read address
-		pac::DMA
-			.ch(DMA_CH_D)
-			.read_addr()
-			.write_value(unsafe { CHUNK_D_PTR } as u32);
+		DMA_COMPLETED_CHUNK.store(
+			(idx + 1) & MAX_CHUNK_INDEX, // Wrap around the chunk index
+			core::sync::atomic::Ordering::Relaxed,
+		);
 	}
 }

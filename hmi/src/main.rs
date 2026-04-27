@@ -5,7 +5,7 @@ use crate::board::{
 	AssignedResources, BacklightResources, DisplayCtrlResources, DisplayDataResources,
 	DisplayFillResources, DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
 };
-use crate::drivers::display::spawn_display_tasks;
+use crate::drivers::display::display_task;
 use crate::services::backlight::{backlight_task, wake_screen};
 use crate::services::gui::gui_task;
 use core::mem::MaybeUninit;
@@ -97,13 +97,12 @@ fn main() -> ! {
 			// Setup the executor for core 1 to run higher priority tasks
 			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
 			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			spawn_display_tasks(
-				&spawner1_high,
+			spawner1_high.spawn(unwrap!(display_task(
 				r.display_ctrl,
 				r.display_timing,
 				r.display_data,
 				r.display_fill,
-			);
+			)));
 
 			// Run the GUI on core 1 at lower priority
 			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
