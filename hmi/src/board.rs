@@ -56,6 +56,8 @@ assign_resources! {
 		dma_b: DMA_CH13,
 		dma_c: DMA_CH14,
 		dma_d: DMA_CH15,
+
+		// Uses DMA IRQ3
 	}
 	display_fill: DisplayFillResources {
 		dma_fill: DMA_CH0,

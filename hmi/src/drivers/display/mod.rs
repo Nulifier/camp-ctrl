@@ -1,18 +1,18 @@
 use defmt::{info, unwrap};
 use embassy_executor::SendSpawner;
-use embassy_sync::{
-	blocking_mutex::raw::CriticalSectionRawMutex,
-	signal::Signal,
-	zerocopy_channel::{Channel, Receiver, Sender},
-};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel, signal::Signal};
+use embassy_time::{Duration, Timer};
 use hmi_gui::DISPLAY_WIDTH;
-use static_cell::{ConstStaticCell, StaticCell};
 
-use crate::board::{
-	DisplayCtrlResources, DisplayDataResources, DisplayFillResources, DisplayTimingResources,
+use crate::{
+	board::{
+		DisplayCtrlResources, DisplayDataResources, DisplayFillResources, DisplayTimingResources,
+	},
+	drivers::display::{chunks::init_chunk_pool, rgb::RgbEngine},
 };
 
 mod buffers;
+mod chunks;
 mod ctrl;
 mod fill;
 mod pio_progs;
@@ -22,13 +22,7 @@ mod timing;
 
 const PCLK_FREQUENCY: u32 = 25_000_000; // 25 MHz
 
-/// Number of lines of pixel data to buffer in SRAM (as opposed to PSRAM)
-const SRAM_BUFFER_LINES: usize = 8;
-
-/// Number of chunk buffers to use. Must be at least 2 to allow double buffering
-const SRAM_BUFFER_COUNT: usize = 4;
-
-type ChunkBuffer = [u16; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES];
+const FRAME_PIXELS: usize = (DISPLAY_WIDTH as usize) * (hmi_gui::DISPLAY_HEIGHT as usize);
 
 static SWAP_REQUESTED: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 
@@ -36,6 +30,12 @@ static SWAP_REQUESTED: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 pub fn request_swap() {
 	SWAP_REQUESTED.signal(true);
 }
+
+static FREE_CHUNKS: channel::Channel<
+	CriticalSectionRawMutex,
+	usize,
+	{ chunks::SRAM_BUFFER_COUNT },
+> = channel::Channel::new();
 
 pub fn spawn_display_tasks<'a>(
 	spawner: &SendSpawner,
@@ -45,34 +45,24 @@ pub fn spawn_display_tasks<'a>(
 	_r_fill: DisplayFillResources,
 ) {
 	// Create the chunk buffers
-	static CHUNK_BUFS: ConstStaticCell<[ChunkBuffer; SRAM_BUFFER_COUNT]> =
-		ConstStaticCell::new([[0; DISPLAY_WIDTH as usize * SRAM_BUFFER_LINES]; SRAM_BUFFER_COUNT]);
+	let chunks = init_chunk_pool();
 
 	// Fill the chunk buffers with a test pattern
-	let chunks = CHUNK_BUFS.take();
-	for chunk in chunks.iter_mut() {
+	for i in 0..chunks::SRAM_BUFFER_COUNT {
+		let chunk = chunks.get_mut(i);
 		test_patterns::fill_chunk_with_test_pattern(chunk);
 	}
 
-	// Create a channel through which we'll send filled chunks to the flush task
-	static READY_CHUNK_CHANNEL: StaticCell<Channel<'_, CriticalSectionRawMutex, ChunkBuffer>> =
-		StaticCell::new();
-	let channel = READY_CHUNK_CHANNEL.init(Channel::new(chunks));
-
-	let (sender, receiver) = channel.split();
-
 	info!("Spawning display tasks");
 	// Spawn the fill and flush tasks
-	spawner.spawn(unwrap!(display_fill_task(sender)));
+	spawner.spawn(unwrap!(display_fill_task(chunks)));
 	spawner.spawn(unwrap!(display_flush_task(
-		receiver, r_ctrl, r_timing, r_data
+		chunks, r_ctrl, r_timing, r_data
 	)));
 }
 
 #[embassy_executor::task]
-pub async fn display_fill_task(
-	mut chunk_sender: Sender<'static, CriticalSectionRawMutex, ChunkBuffer>,
-) {
+pub async fn display_fill_task(_chunks: &'static chunks::ChunkPool) {
 	info!("Starting display fill task");
 
 	// We're going to cheat and just send the test pattern chunks
@@ -82,17 +72,27 @@ pub async fn display_fill_task(
 			// TODO: Do a frame swap
 		}
 
-		let mut _chunk = chunk_sender.send().await;
+		// info!("Top of frame");
 
-		// Do nothing
+		// Loop through enough chunks to fill a frame
+		const CHUNKS_PER_FRAME: usize = FRAME_PIXELS / chunks::CHUNK_PIXELS;
+		for _ in 0..CHUNKS_PER_FRAME {
+			// Get a free chunk
+			let _chunk_index = FREE_CHUNKS.receive().await;
 
-		chunk_sender.send_done();
+			// info!("Filled chunk, index: {}", _chunk_index);
+
+			// Copy data from current frame buffer to chunk buffer
+			// TODO: Implement this, currently we just use the pre-filled test pattern chunks
+
+			// We don't need to send the chunk to the flush task as it just loops forever
+		}
 	}
 }
 
 #[embassy_executor::task]
 pub async fn display_flush_task(
-	mut chunk_receiver: Receiver<'static, CriticalSectionRawMutex, ChunkBuffer>,
+	chunks: &'static chunks::ChunkPool,
 	r_ctrl: DisplayCtrlResources,
 	r_timing: DisplayTimingResources,
 	r_data: DisplayDataResources,
@@ -108,17 +108,18 @@ pub async fn display_flush_task(
 	unwrap!(timing_engine.init());
 	unwrap!(rgb_engine.init());
 
-	// Wait for the first chunk before we start the display timing.
+	// Setup and start DMA ring
+	rgb_engine.start_dma_ring([chunks.ptr(0), chunks.ptr(1), chunks.ptr(2), chunks.ptr(3)]);
+
+	// Start the engines
 	unwrap!(rgb_engine.start());
 	unwrap!(timing_engine.start());
 
 	loop {
-		let chunk = chunk_receiver.receive().await;
+		// The flush task doesn't actually need to do anything in this implementation as the RGB
+		// engine is just continuously DMA'ing the chunk buffers in a ring.
+		RgbEngine::print_debug();
 
-		// Flush the chunk to the display
-		unwrap!(rgb_engine.flush_chunk(chunk).await);
-
-		// Mark the chunk as free
-		chunk_receiver.receive_done();
+		Timer::after(Duration::from_secs(5)).await;
 	}
 }

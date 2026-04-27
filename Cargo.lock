@@ -855,6 +855,7 @@ dependencies = [
  "lvgl",
  "panic-probe",
  "rlsf",
+ "rp-pac",
  "static_cell",
 ]
 
@@ -1406,6 +1407,7 @@ checksum = "8af65855c40b2c35079514c5489abffc0429347fef25d8467ff98ad84b4322d3"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
+ "defmt 0.3.100",
 ]
 
 [[package]]
