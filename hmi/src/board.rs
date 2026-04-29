@@ -5,7 +5,7 @@ bind_interrupts!(pub(crate) struct Irqs {
 	I2C1_IRQ => i2c::InterruptHandler<peripherals::I2C1>;
 	PIO0_IRQ_0 => pio::InterruptHandler<peripherals::PIO0>;
 	PIO1_IRQ_0 => pio::InterruptHandler<peripherals::PIO1>;
-	DMA_IRQ_0 => dma::InterruptHandler<peripherals::DMA_CH12>;
+	// DMA_IRQ_0 => dma::InterruptHandler<peripherals::DMA_CH0>;
 });
 
 assign_resources! {

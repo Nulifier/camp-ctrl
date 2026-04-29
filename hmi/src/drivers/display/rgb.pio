@@ -61,6 +61,8 @@ FrontPorch:
 	wait 1 irq 2 side 1        ; Wait for hsync to signal the end of the line
 	jmp x-- FrontPorch side 1
 
+; TODO: Send VSYNC IRQ to main program so it can sync to the start of the frame
+
 ; SyncPulse
 set x, T_VSYNC side 0          ; Set VSYNC low
 SyncPulse:

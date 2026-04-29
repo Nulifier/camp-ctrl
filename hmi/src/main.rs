@@ -16,7 +16,7 @@ use embassy_rp::block::ImageDef;
 use embassy_rp::executor::{Executor, InterruptExecutor};
 use embassy_rp::interrupt::InterruptExt;
 use embassy_rp::multicore::{Stack, spawn_core1};
-use embassy_rp::{self as hal, interrupt};
+use embassy_rp::{self as hal, clocks, interrupt};
 use embedded_alloc::TlsfHeap as Heap;
 
 pub mod board;
@@ -24,7 +24,6 @@ pub mod drivers;
 pub mod error;
 pub mod gui;
 pub mod services;
-pub mod touch;
 pub mod utils;
 
 // Panic handler
@@ -45,7 +44,7 @@ static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1_HIGH: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR1_GUI: StaticCell<Executor> = StaticCell::new();
 
-const HEAP_SIZE: usize = 16 * 1024 * 10; // 16 KB
+const HEAP_SIZE: usize = 16 * 1024; // 32 KB
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
@@ -84,7 +83,17 @@ fn main() -> ! {
 		}
 	}
 
-	let p = hal::init(Default::default());
+	// Lets crank this puppy
+	const CORE_FREQ_MHZ: u32 = 220;
+
+	let mut config = hal::config::Config::new(
+		hal::clocks::ClockConfig::system_freq(CORE_FREQ_MHZ * 1000 * 1000).unwrap(),
+	);
+
+	// Only needed if the core needs a bit more juice
+	config.clocks.core_voltage = hal::clocks::CoreVoltage::V1_15;
+
+	let p = hal::init(config);
 	let r = split_resources!(p);
 
 	// Initialize the PSRAM allocator
@@ -94,23 +103,30 @@ fn main() -> ! {
 		p.CORE1,
 		unsafe { &mut *addr_of_mut!(CORE1_STACK) },
 		move || {
-			// Setup the executor for core 1 to run higher priority tasks
-			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
-			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			spawner1_high.spawn(unwrap!(display_task(
+			display_task(
 				r.display_ctrl,
 				r.display_timing,
 				r.display_data,
 				r.display_fill,
-			)));
+			);
+
+			// Setup the executor for core 1 to run higher priority tasks
+			// interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
+			// let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
+			// spawner1_high.spawn(unwrap!(display_task(
+			// 	r.display_ctrl,
+			// 	r.display_timing,
+			// 	r.display_data,
+			// 	r.display_fill,
+			// )));
 
 			// Run the GUI on core 1 at lower priority
-			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
-			executor1_gui.run(|spawner1_low| {
-				//////////////////////////////////////////////////////////////
-				// Core1: UI and related tasks
-				spawner1_low.spawn(unwrap!(gui_task()));
-			})
+			// let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
+			// executor1_gui.run(|spawner1_low| {
+			// 	//////////////////////////////////////////////////////////////
+			// 	// Core1: UI and related tasks
+			// 	// spawner1_low.spawn(unwrap!(gui_task()));
+			// })
 		},
 	);
 

@@ -5,7 +5,7 @@ use core::alloc::Layout;
 use core::cell::RefCell;
 use core::ptr::NonNull;
 use critical_section::Mutex;
-use defmt::{assert, panic, unwrap};
+use defmt::{assert, info, panic, unwrap};
 use embassy_rp::psram;
 use embassy_rp::qmi_cs1::QmiCs1;
 use rlsf::Tlsf;
@@ -125,15 +125,22 @@ impl PsramHeap {
 static PSRAM_HEAP: PsramHeap = PsramHeap::empty();
 
 fn psram_config() -> psram::Config {
+	let sys_clk_hz = embassy_rp::clocks::clk_sys_freq();
+
+	info!(
+		"Initializing PSRAM heap with system clock {} Hz",
+		sys_clk_hz
+	);
+
 	// Config based on the W25Q128JVSIQ PSRAM chip used on the board
 	psram::Config::custom(
-		125_000_000,             // Default to 125MHz
-		109_000_000,             // Max frequency for 3.3V operation
+		sys_clk_hz,              // Default to 150MHz
+		130_000_000,             // Max of 133Mhz in 3.3V operation
 		8,                       // 8µs max CS assert
 		50,                      // 50ns min CS deassert
 		1,                       // Assume 1 SCLK cycle cooldown
 		psram::PageBreak::_1024, // 1024-byte page size
-		2,                       // Clock divider is 125MHz/ 109Mhz = 2 (round up)
+		2,                       // Clock divider is 220MHz/ 130Mhz = 2 (round up)
 		Some(0x35),              // Enter quad mode command
 		0xEB,                    // Fast quad read command
 		Some(0x38),              // Quad page program (write) command

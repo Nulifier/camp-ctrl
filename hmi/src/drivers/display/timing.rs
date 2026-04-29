@@ -1,6 +1,7 @@
 use crate::board::DisplayTimingResources;
 use crate::drivers::display::PCLK_FREQUENCY;
 use crate::error::{Error, Result};
+use defmt::info;
 use embassy_rp::pio::{PinConfig, PioBatch};
 use embassy_rp::{peripherals, pio};
 use fixed::types::U24F8;
