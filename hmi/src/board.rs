@@ -69,4 +69,8 @@ assign_resources! {
 		tp_rst: PIN_19,
 		tp_int: PIN_18,
 	}
+system: SystemResources {
+		adc: ADC,
+		temp_sensor: ADC_TEMP_SENSOR,
+	}
 }
