@@ -7,16 +7,16 @@ use fixed::types::U24F8;
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub(super) struct TimingEngine {
-	pub common: pio::Common<'static, peripherals::PIO0>,
+	common: pio::Common<'static, peripherals::PIO0>,
 
-	pub sm0: pio::StateMachine<'static, peripherals::PIO0, 0>,
-	pub sm1: pio::StateMachine<'static, peripherals::PIO0, 1>,
+	sm0: pio::StateMachine<'static, peripherals::PIO0, 0>,
+	sm1: pio::StateMachine<'static, peripherals::PIO0, 1>,
 
-	pub irq_vsync: pio::Irq<'static, peripherals::PIO0, 3>,
+	irq_vsync: pio::Irq<'static, peripherals::PIO0, 3>,
 
-	pub vsync_pin: pio::Pin<'static, peripherals::PIO0>,
-	pub hsync_pin: pio::Pin<'static, peripherals::PIO0>,
-	pub pclk_pin: pio::Pin<'static, peripherals::PIO0>,
+	vsync_pin: pio::Pin<'static, peripherals::PIO0>,
+	hsync_pin: pio::Pin<'static, peripherals::PIO0>,
+	pclk_pin: pio::Pin<'static, peripherals::PIO0>,
 }
 
 impl TimingEngine {
@@ -78,7 +78,6 @@ impl TimingEngine {
 		let mut vsync_cfg = pio::Config::default();
 		vsync_cfg.use_program(&vsync_prg, &[&self.vsync_pin]);
 		vsync_cfg.fifo_join = pio::FifoJoin::TxOnly;
-		// vsync_cfg.clock_divider = divider;
 		unsafe {
 			vsync_cfg.set_pins(PinConfig {
 				in_base: 0,

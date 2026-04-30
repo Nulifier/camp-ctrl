@@ -1,5 +1,5 @@
 use defmt::{info, unwrap};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel, signal::Signal};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 use crate::{
@@ -20,16 +20,9 @@ mod timing;
 
 const PCLK_FREQUENCY: u32 = 25_000_000; // 25 MHz
 
-const FRAME_PIXELS: usize = (DISPLAY_WIDTH as usize) * (hmi_gui::DISPLAY_HEIGHT as usize);
+const FRAME_PIXELS: usize = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
 
 type FrameBuffers = DoubleBuffers<{ FRAME_PIXELS }, u16>;
-
-static SWAP_REQUESTED: Signal<CriticalSectionRawMutex, bool> = Signal::new();
-
-/// Request that the display driver swaps the active frame buffer at the next frame start.
-pub fn request_swap() {
-	SWAP_REQUESTED.signal(true);
-}
 
 static FREE_CHUNKS: channel::Channel<
 	CriticalSectionRawMutex,
@@ -42,7 +35,7 @@ pub async fn display_task(
 	r_ctrl: DisplayCtrlResources,
 	r_timing: DisplayTimingResources,
 	r_data: DisplayDataResources,
-	_r_fill: DisplayFillResources,
+	r_fill: DisplayFillResources,
 ) -> ! {
 	info!("Starting display driver");
 
@@ -61,42 +54,18 @@ pub async fn display_task(
 	let mut ctrl_engine = ctrl::CtrlEngine::new(r_ctrl);
 	let mut timing_engine = timing::TimingEngine::new(r_timing);
 	let mut rgb_engine = rgb::RgbEngine::new(r_data);
+	let mut fill_engine = fill::FillEngine::new(r_fill, frame_buffers, chunks);
 
 	ctrl_engine.reset().await;
 	unwrap!(timing_engine.init());
 	unwrap!(rgb_engine.init([chunks.ptr(0), chunks.ptr(1)]));
+	fill_engine.init();
 
 	// Start the engines
 	unwrap!(rgb_engine.start());
 	unwrap!(timing_engine.start());
 
 	info!("Display driver started");
-
-	const MAX_TRANSFER_INDEX: usize = DISPLAY_HEIGHT as usize / chunks::CHUNK_BUFFER_LINES;
-
-	// LCD Timing Diagram
-	//
-
-	// It takes 480 lines / 80 lines per chunk = 6 chunk transfers to transfer a full frame
-	// Frame layout:
-	// VBLANK:
-	// 		FRONT PORCH
-	// - Check for swap request and swap frame buffers if requested
-	// - Transfer chunk 0 (lines 0-79) for the next frame
-	// 		VSYNC PULSE
-	// 		BACK PORCH
-	// ACTIVE:
-	// - Send chunk 0 to RGB PIO
-	// - Transfer chunk 1 (lines 80-159)
-	// - Send chunk 1 to RGB PIO
-	// - Transfer chunk 0 (lines 160-239)
-	// - Send chunk 0 to RGB PIO
-	// - Transfer chunk 1 (lines 240-319)
-	// - Send chunk 1 to RGB PIO
-	// - Transfer chunk 0 (lines 320-399)
-	// - Send chunk 0 to RGB PIO
-	// - Transfer chunk 1 (lines 400-479)
-	// - Send chunk 1 to RGB PIO
 
 	// | PHASE   | Fill Chunk                 | RGB Chunk    |
 	// | ------- | -------------------------- | ------------ |
@@ -111,6 +80,7 @@ pub async fn display_task(
 
 	loop {
 		timing_engine.wait_for_vblank().await;
+		fill_engine.on_vblank();
 
 		// On startup or while the final chunk is being pushed to the PIO
 		// the first chunk can be filled with the first chunk of the active frame buffer
@@ -123,18 +93,21 @@ pub async fn display_task(
 		// - Clear PIO FIFOs
 		// - Restart the RGB DMA chain pointing to chunk buffer 0
 
-		for transfer_index in 0..MAX_TRANSFER_INDEX {
-			let transfer_index = (transfer_index + chunks::CHUNK_BUFFER_COUNT) % MAX_TRANSFER_INDEX;
+		while let Some(frame_buffer_index) = fill_engine.get_next_frame_buffer_index() {
+			fill_engine.fill_next_chunk(frame_buffer_index);
+		}
 
-			let chunk_idx = FREE_CHUNKS.receive().await;
+		// Check if a swap was requested during the VBLANK and swap if so
+		fill_engine.swap_if_requested();
 
-			let pixel_start = transfer_index * chunks::CHUNK_PIXELS;
-			let pixel_end = pixel_start + chunks::CHUNK_PIXELS;
-
-			let frame_buffer_slice = &frame_buffers.active_slice()[pixel_start..pixel_end];
-			let chunk_slice = chunks.get_mut(chunk_idx);
-
-			chunk_slice.copy_from_slice(frame_buffer_slice);
+		// Fill the first chunk of the next frame while the last chunk of the current frame is being pushed to the PIO
+		{
+			let frame_buffer_index = fill_engine.get_next_frame_buffer_index().unwrap();
+			assert!(
+				frame_buffer_index == 0,
+				"Expected to fill the first chunk of the frame buffer after VBLANK"
+			);
+			fill_engine.fill_next_chunk(frame_buffer_index);
 		}
 	}
 }

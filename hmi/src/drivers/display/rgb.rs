@@ -34,37 +34,37 @@ const DMA_PIXELS_MASK: u32 = 1 << DMA_PIXELS;
 const DMA_IRQ_NUM: usize = 3;
 
 pub(super) struct RgbEngine {
-	pub common: pio::Common<'static, peripherals::PIO1>,
+	common: pio::Common<'static, peripherals::PIO1>,
 
-	pub sm0: pio::StateMachine<'static, peripherals::PIO1, 0>,
-	pub sm1: pio::StateMachine<'static, peripherals::PIO1, 1>,
+	sm0: pio::StateMachine<'static, peripherals::PIO1, 0>,
+	sm1: pio::StateMachine<'static, peripherals::PIO1, 1>,
 
-	pub de_pin: pio::Pin<'static, peripherals::PIO1>,
+	de_pin: pio::Pin<'static, peripherals::PIO1>,
 
-	pub b3_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub b4_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub b5_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub b6_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub b7_pin: pio::Pin<'static, peripherals::PIO1>,
+	b3_pin: pio::Pin<'static, peripherals::PIO1>,
+	b4_pin: pio::Pin<'static, peripherals::PIO1>,
+	b5_pin: pio::Pin<'static, peripherals::PIO1>,
+	b6_pin: pio::Pin<'static, peripherals::PIO1>,
+	b7_pin: pio::Pin<'static, peripherals::PIO1>,
 
-	pub g2_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub g3_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub g4_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub g5_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub g6_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub g7_pin: pio::Pin<'static, peripherals::PIO1>,
+	g2_pin: pio::Pin<'static, peripherals::PIO1>,
+	g3_pin: pio::Pin<'static, peripherals::PIO1>,
+	g4_pin: pio::Pin<'static, peripherals::PIO1>,
+	g5_pin: pio::Pin<'static, peripherals::PIO1>,
+	g6_pin: pio::Pin<'static, peripherals::PIO1>,
+	g7_pin: pio::Pin<'static, peripherals::PIO1>,
 
-	pub r3_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub r4_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub r5_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub r6_pin: pio::Pin<'static, peripherals::PIO1>,
-	pub r7_pin: pio::Pin<'static, peripherals::PIO1>,
+	r3_pin: pio::Pin<'static, peripherals::PIO1>,
+	r4_pin: pio::Pin<'static, peripherals::PIO1>,
+	r5_pin: pio::Pin<'static, peripherals::PIO1>,
+	r6_pin: pio::Pin<'static, peripherals::PIO1>,
+	r7_pin: pio::Pin<'static, peripherals::PIO1>,
 
 	// We just hold references to the DMA channels here as we're doing this using the PAC
 	#[allow(dead_code)]
-	pub dma_channel_pixels: Peri<'static, peripherals::DMA_CH14>,
+	dma_channel_pixels: Peri<'static, peripherals::DMA_CH14>,
 	#[allow(dead_code)]
-	pub dma_channel_ctrl: Peri<'static, peripherals::DMA_CH15>,
+	dma_channel_ctrl: Peri<'static, peripherals::DMA_CH15>,
 }
 
 impl RgbEngine {

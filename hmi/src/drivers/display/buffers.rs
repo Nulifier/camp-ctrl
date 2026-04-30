@@ -1,14 +1,12 @@
 use crate::utils::psram::PsramBuffer;
 
-#[allow(dead_code)]
-pub struct DoubleBuffers<const N: usize, T> {
+pub(super) struct DoubleBuffers<const N: usize, T> {
 	fb0: PsramBuffer<T, N>,
 	fb1: PsramBuffer<T, N>,
 	active: usize,
 }
 
 impl<const N: usize, T> DoubleBuffers<N, T> {
-	#[allow(dead_code)]
 	pub fn new() -> Self {
 		Self {
 			fb0: PsramBuffer::new().unwrap(),
@@ -70,7 +68,6 @@ impl<const N: usize, T> DoubleBuffers<N, T> {
 		}
 	}
 
-	#[allow(dead_code)]
 	pub fn swap(&mut self) {
 		self.active ^= 1;
 	}
