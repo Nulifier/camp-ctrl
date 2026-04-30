@@ -12,6 +12,7 @@
 ; ---------------------------------------------------------
 ; Horizontal Sync
 ; Runs on PIO0, state machine 0
+; Triggers IRQ 2 at the end of the front porch
 ; ---------------------------------------------------------
 .program hsync
 .side_set 2                    ; LCD_PCLK_PIN(bit1) LCD_HSYNC_PIN(bit0)
@@ -55,13 +56,14 @@ pull block side 1              ; Pull the height to osr
 
 .wrap_target
 
+; Signal the start of the VBLANK period to the main program
+irq set 3 side 1
+
 ; Front porch
 set x, T_VFRONT side 1
 FrontPorch:
 	wait 1 irq 2 side 1        ; Wait for hsync to signal the end of the line
 	jmp x-- FrontPorch side 1
-
-; TODO: Send VSYNC IRQ to main program so it can sync to the start of the frame
 
 ; SyncPulse
 set x, T_VSYNC side 0          ; Set VSYNC low
@@ -75,7 +77,7 @@ BackPorch:
 	wait 1 irq 2 side 1        ; Wait for hsync to signal the end of the line
 	jmp x-- BackPorch side 1
 
-mov x, osr side 1
+mov x, osr side 1              ; Restore height to x
 
 ActiveFor:
 	wait 1 irq 2 side 1        ; Wait for hsync to signal the end of the line
@@ -85,6 +87,7 @@ ActiveFor:
 
 ; ---------------------------------------------------------
 ; RGB DE
+; Runs on PIO1, state machine 0
 ; ---------------------------------------------------------
 .program rgb_de
 .side_set 1                    ; LCD_DE_PIN(bit0)
@@ -93,7 +96,7 @@ pull block side 0              ; Load the width to osr
 
 .wrap_target
 
-mov y, osr side 0              ; Save width to y
+mov y, osr side 0              ; Save height to y
 set x, T_VBACK side 0
 
 wait 0 pin 5 side 0                    ; Wait for vsync to go low
@@ -125,6 +128,7 @@ ActiveFor:
 
 ; ---------------------------------------------------------
 ; RGB Data
+; Runs on PIO1, state machine 1
 ; ---------------------------------------------------------
 .program rgb
 
@@ -136,7 +140,7 @@ mov x,y                        ; Save width to x
 ; wait 1 pin 4                   ; Wait until DE program starts active line
 wait 1 irq 1                   ; Wait until DE program starts active line
 ColorOut:
-	pull block                 ; One RGB565 pixel in low 16 bits
+	pull                  ; One RGB565 pixel in low 16 bits
 	wait 0 pin 7               ; pclk == 0
 	out pins, 16               ; Send rgb data
 	wait 1 pin 7               ; pclk == 1

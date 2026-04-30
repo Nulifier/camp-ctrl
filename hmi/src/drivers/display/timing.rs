@@ -1,7 +1,6 @@
 use crate::board::DisplayTimingResources;
 use crate::drivers::display::PCLK_FREQUENCY;
 use crate::error::{Error, Result};
-use defmt::info;
 use embassy_rp::pio::{PinConfig, PioBatch};
 use embassy_rp::{peripherals, pio};
 use fixed::types::U24F8;
@@ -12,6 +11,8 @@ pub(super) struct TimingEngine {
 
 	pub sm0: pio::StateMachine<'static, peripherals::PIO0, 0>,
 	pub sm1: pio::StateMachine<'static, peripherals::PIO0, 1>,
+
+	pub irq_vsync: pio::Irq<'static, peripherals::PIO0, 3>,
 
 	pub vsync_pin: pio::Pin<'static, peripherals::PIO0>,
 	pub hsync_pin: pio::Pin<'static, peripherals::PIO0>,
@@ -30,6 +31,7 @@ impl TimingEngine {
 			common: pio.common,
 			sm0: pio.sm0,
 			sm1: pio.sm1,
+			irq_vsync: pio.irq3,
 			vsync_pin,
 			hsync_pin,
 			pclk_pin,
@@ -121,5 +123,9 @@ impl TimingEngine {
 		}
 
 		Ok(())
+	}
+
+	pub async fn wait_for_vblank(&mut self) {
+		self.irq_vsync.wait().await;
 	}
 }

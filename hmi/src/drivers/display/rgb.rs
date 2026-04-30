@@ -1,15 +1,15 @@
 use crate::board::DisplayDataResources;
-use crate::drivers::display::chunks::{CHUNK_BUFFER_COUNT, CHUNK_BUFFER_LINES, CHUNK_PIXELS};
+use crate::drivers::display::FREE_CHUNKS;
 use crate::error::Result;
-use defmt::{assert_eq, info};
+use defmt::assert_eq;
 use embassy_rp::{Peri, interrupt};
 use embassy_rp::{
 	gpio, peripherals,
 	pio::{self, PioBatch},
 };
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use rp_pac as pac;
 use rp_pac::dma::regs::CtrlTrig;
+use rp_pac::{self as pac};
 
 // This alignment makes sure that we can read the chunk ptrs in a ring buffer as it needs to be
 // a round binary value for the wrapping to work correctly.
@@ -362,96 +362,10 @@ impl RgbEngine {
 /// Tracks what which is the next chunk to be completed by the DMA
 static DMA_COMPLETED_CHUNK: core::sync::atomic::AtomicUsize =
 	core::sync::atomic::AtomicUsize::new(0);
-static DMA_FREE_CHUNK_OVERFLOW: core::sync::atomic::AtomicBool =
-	core::sync::atomic::AtomicBool::new(false);
-static DMA_IRQ_MAX_CYCLES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-static DMA_IRQ_OVERRUNS: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-static DMA_IRQ_COUNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-
-// We start after the preloaded chunk buffers.
-static TRANSFER_INDEX: core::sync::atomic::AtomicUsize =
-	core::sync::atomic::AtomicUsize::new(CHUNK_BUFFER_COUNT);
-
-static mut CHUNK_PTRS: [*mut u16; super::chunks::CHUNK_BUFFER_COUNT] =
-	[core::ptr::null_mut(); super::chunks::CHUNK_BUFFER_COUNT];
-
-static mut FRAME_BUFFER_PTR: *const u16 = core::ptr::null();
-
-pub fn set_chunk_ptr(index: usize, ptr: *mut u16) {
-	unsafe {
-		CHUNK_PTRS[index] = ptr;
-	}
-}
-
-pub fn set_frame_buffer_ptr(ptr: *const u16) {
-	unsafe {
-		FRAME_BUFFER_PTR = ptr;
-	}
-}
-
-pub(super) fn enable_dma_irq_cycle_counter() {
-	const DEMCR: *mut u32 = 0xE000_EDFC as *mut u32;
-	const DWT_CTRL: *mut u32 = 0xE000_1000 as *mut u32;
-	const DWT_CYCCNT: *mut u32 = 0xE000_1004 as *mut u32;
-	const DEMCR_TRCENA: u32 = 1 << 24;
-	const DWT_CTRL_CYCCNTENA: u32 = 1;
-
-	unsafe {
-		let demcr = core::ptr::read_volatile(DEMCR);
-		core::ptr::write_volatile(DEMCR, demcr | DEMCR_TRCENA);
-
-		core::ptr::write_volatile(DWT_CYCCNT, 0);
-
-		let dwt_ctrl = core::ptr::read_volatile(DWT_CTRL);
-		core::ptr::write_volatile(DWT_CTRL, dwt_ctrl | DWT_CTRL_CYCCNTENA);
-	}
-}
-
-#[inline(always)]
-fn dma_irq_cycle_count() -> u32 {
-	const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
-	unsafe { core::ptr::read_volatile(DWT_CYCCNT) }
-}
-
-#[inline(always)]
-fn update_dma_irq_max_cycles(cycles: u32) {
-	let mut prev = DMA_IRQ_MAX_CYCLES.load(core::sync::atomic::Ordering::Relaxed);
-	while cycles > prev {
-		match DMA_IRQ_MAX_CYCLES.compare_exchange_weak(
-			prev,
-			cycles,
-			core::sync::atomic::Ordering::Relaxed,
-			core::sync::atomic::Ordering::Relaxed,
-		) {
-			Ok(_) => break,
-			Err(current) => prev = current,
-		}
-	}
-}
-
-pub(super) fn dma_irq_max_cycles() -> u32 {
-	DMA_IRQ_MAX_CYCLES.load(core::sync::atomic::Ordering::Relaxed)
-}
-
-pub(super) fn dma_irq_overruns() -> u32 {
-	DMA_IRQ_OVERRUNS.load(core::sync::atomic::Ordering::Relaxed)
-}
-
-pub(super) fn dma_irq_count() -> u32 {
-	DMA_IRQ_COUNT.load(core::sync::atomic::Ordering::Relaxed)
-}
-
-pub(super) fn clear_dma_irq_stats() {
-	DMA_IRQ_MAX_CYCLES.store(0, core::sync::atomic::Ordering::Relaxed);
-	DMA_IRQ_OVERRUNS.store(0, core::sync::atomic::Ordering::Relaxed);
-	DMA_IRQ_COUNT.store(0, core::sync::atomic::Ordering::Relaxed);
-}
 
 #[interrupt]
 fn DMA_IRQ_3() {
 	const MAX_CHUNK_INDEX: usize = super::chunks::CHUNK_BUFFER_COUNT - 1;
-	const MAX_TRANSFER_INDEX: usize = DISPLAY_HEIGHT as usize / CHUNK_BUFFER_LINES;
-	// let irq_start_cycles = dma_irq_cycle_count();
 
 	let pending = pac::DMA.ints(DMA_IRQ_NUM).read();
 
@@ -459,61 +373,15 @@ fn DMA_IRQ_3() {
 		// Clear the interrupt flag
 		pac::DMA.ints(DMA_IRQ_NUM).write_value(DMA_PIXELS_MASK);
 
-		let transfer_index = TRANSFER_INDEX.load(core::sync::atomic::Ordering::Relaxed);
-
 		// This is the index of the chunk we're going to copy the framebuffer data into
 		let chunk_idx = DMA_COMPLETED_CHUNK.load(core::sync::atomic::Ordering::Relaxed);
 
-		// Get framebuffer slice for the chunk
-		let frame_buffer_slice = unsafe {
-			core::slice::from_raw_parts(
-				FRAME_BUFFER_PTR.add(transfer_index * CHUNK_PIXELS),
-				super::chunks::CHUNK_PIXELS * 4 / 4,
-			)
-		};
-
-		// Copy to the chunk
-		let chunk_slice = unsafe {
-			core::slice::from_raw_parts_mut(
-				CHUNK_PTRS[chunk_idx],
-				super::chunks::CHUNK_PIXELS * 4 / 4,
-			)
-		};
-
-		chunk_slice.copy_from_slice(frame_buffer_slice);
-
-		// Wrap the line index around to the top if we've reached the end of the framebuffer
-		TRANSFER_INDEX.store(
-			(transfer_index + 1) % MAX_TRANSFER_INDEX,
-			core::sync::atomic::Ordering::Relaxed,
-		);
-
-		// // Signal free chunk
-		// if FREE_CHUNKS.try_send(idx).is_err() {
-		// 	DMA_FREE_CHUNK_OVERFLOW.store(true, core::sync::atomic::Ordering::Relaxed);
-		// }
+		// Signal free chunk
+		let _ = FREE_CHUNKS.try_send(chunk_idx).is_ok();
 
 		DMA_COMPLETED_CHUNK.store(
 			(chunk_idx + 1) & MAX_CHUNK_INDEX, // Wrap around the chunk index
 			core::sync::atomic::Ordering::Relaxed,
 		);
-
-		DMA_IRQ_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-
-		// if pac::DMA.ints(DMA_IRQ_NUM).read() & DMA_PIXELS_MASK != 0 {
-		// 	// A new pixel DMA completion arrived before we left this ISR.
-		// 	DMA_IRQ_OVERRUNS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-		// }
 	}
-
-	// let irq_cycles = dma_irq_cycle_count().wrapping_sub(irq_start_cycles);
-	// update_dma_irq_max_cycles(irq_cycles);
-}
-
-pub(super) fn dma_free_chunk_overflow() -> bool {
-	DMA_FREE_CHUNK_OVERFLOW.load(core::sync::atomic::Ordering::Relaxed)
-}
-
-pub(super) fn clear_dma_free_chunk_overflow() {
-	DMA_FREE_CHUNK_OVERFLOW.store(false, core::sync::atomic::Ordering::Relaxed);
 }

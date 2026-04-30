@@ -1,11 +1,11 @@
 use assign_resources::assign_resources;
-use embassy_rp::{Peri, bind_interrupts, dma, i2c, peripherals, pio};
+use embassy_rp::{Peri, adc, bind_interrupts, i2c, peripherals, pio};
 
 bind_interrupts!(pub(crate) struct Irqs {
 	I2C1_IRQ => i2c::InterruptHandler<peripherals::I2C1>;
 	PIO0_IRQ_0 => pio::InterruptHandler<peripherals::PIO0>;
 	PIO1_IRQ_0 => pio::InterruptHandler<peripherals::PIO1>;
-	// DMA_IRQ_0 => dma::InterruptHandler<peripherals::DMA_CH0>;
+	ADC_IRQ_FIFO => adc::InterruptHandler;
 });
 
 assign_resources! {
@@ -58,7 +58,7 @@ assign_resources! {
 		// Uses DMA IRQ3
 	}
 	display_fill: DisplayFillResources {
-		dma_fill: DMA_CH0,
+		dma_fill: DMA_CH13,
 	}
 	backlight: BacklightResources {
 		lcd_en: PIN_45,
@@ -69,7 +69,7 @@ assign_resources! {
 		tp_rst: PIN_19,
 		tp_int: PIN_18,
 	}
-system: SystemResources {
+	system: SystemResources {
 		adc: ADC,
 		temp_sensor: ADC_TEMP_SENSOR,
 	}

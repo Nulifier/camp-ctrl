@@ -1,5 +1,4 @@
 use core::cell::UnsafeCell;
-
 use hmi_gui::DISPLAY_WIDTH;
 use static_cell::{ConstStaticCell, StaticCell};
 
@@ -31,11 +30,6 @@ impl ChunkPool {
 
 	pub fn get_mut(&self, index: usize) -> &'static mut ChunkBuffer {
 		unsafe { &mut (*self.chunks.get())[index] }
-	}
-
-	/// FOR TESTING ONLY - DO NOT USE THIS IN PRODUCTION CODE AS IT CAN CAUSE DATA RACES
-	pub fn as_mut_ptr(&self, index: usize) -> *mut u16 {
-		unsafe { (*self.chunks.get())[index].as_mut_ptr() }
 	}
 }
 

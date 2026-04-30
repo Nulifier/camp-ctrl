@@ -3,7 +3,8 @@
 
 use crate::board::{
 	AssignedResources, BacklightResources, DisplayCtrlResources, DisplayDataResources,
-	DisplayFillResources, DisplayTimingResources, I2c1Resources, PsramResources, TouchResources,
+	DisplayFillResources, DisplayTimingResources, I2c1Resources, PsramResources, SystemResources,
+	TouchResources,
 };
 use crate::drivers::display::display_task;
 use crate::services::backlight::{backlight_task, wake_screen};
@@ -16,7 +17,7 @@ use embassy_rp::block::ImageDef;
 use embassy_rp::executor::{Executor, InterruptExecutor};
 use embassy_rp::interrupt::InterruptExt;
 use embassy_rp::multicore::{Stack, spawn_core1};
-use embassy_rp::{self as hal, clocks, interrupt};
+use embassy_rp::{self as hal, interrupt};
 use embedded_alloc::TlsfHeap as Heap;
 
 pub mod board;
@@ -103,30 +104,23 @@ fn main() -> ! {
 		p.CORE1,
 		unsafe { &mut *addr_of_mut!(CORE1_STACK) },
 		move || {
-			display_task(
+			// Setup the executor for core 1 to run higher priority tasks
+			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
+			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
+			spawner1_high.spawn(unwrap!(display_task(
 				r.display_ctrl,
 				r.display_timing,
 				r.display_data,
 				r.display_fill,
-			);
-
-			// Setup the executor for core 1 to run higher priority tasks
-			// interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
-			// let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			// spawner1_high.spawn(unwrap!(display_task(
-			// 	r.display_ctrl,
-			// 	r.display_timing,
-			// 	r.display_data,
-			// 	r.display_fill,
-			// )));
+			)));
 
 			// Run the GUI on core 1 at lower priority
-			// let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
-			// executor1_gui.run(|spawner1_low| {
-			// 	//////////////////////////////////////////////////////////////
-			// 	// Core1: UI and related tasks
-			// 	// spawner1_low.spawn(unwrap!(gui_task()));
-			// })
+			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
+			executor1_gui.run(|spawner1_low| {
+				//////////////////////////////////////////////////////////////
+				// Core1: UI and related tasks
+				spawner1_low.spawn(unwrap!(gui_task(r.system)));
+			})
 		},
 	);
 
