@@ -1012,6 +1012,7 @@ name = "lvgl"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.11.0",
+ "defmt 1.0.1",
  "lvgl-sys",
  "num_enum",
 ]

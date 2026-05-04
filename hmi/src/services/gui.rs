@@ -1,30 +1,37 @@
 use defmt::info;
-use embassy_rp::adc;
-use embassy_time::{Duration, Timer};
+use embassy_time::Timer;
+use lvgl::display::LvDisplay;
 
-use crate::board::{self, SystemResources};
+use crate::drivers::display::FRAME_BUFFER_SWAPPED;
 
 #[embassy_executor::task]
-pub async fn gui_task(r: SystemResources) -> ! {
-	info!("Starting GUI task");
+pub async fn gui_task() {
+	info!("Starting GUI");
 
-	let mut adc = adc::Adc::new(r.adc, board::Irqs, adc::Config::default());
-	let mut temp_sensor = adc::Channel::new_temp_sensor(r.temp_sensor);
+	hmi_gui::initialize();
+
+	let mut display = crate::gui::display::create_rp_display().await;
+	display.set_default();
+
+	// display.refresh_now();
+
+	lvgl::tick::set_get_fn(crate::gui::get_millis);
+
+	info!("GUI initialized");
+
+	let _gui = hmi_gui::gui::Gui::new();
 
 	loop {
-		// Read the temperature sensor
-		let temp_sensor = adc.read(&mut temp_sensor).await.unwrap();
-		let temp_celsius = convert_adc_to_celsius(temp_sensor);
-		info!("Temperature: {}°C", temp_celsius);
+		let timeout_ms = hmi_gui::do_loop();
 
-		// Wait for 1 second
-		Timer::after(Duration::from_secs(5)).await;
+		// if let Some(_) = FRAME_BUFFER_SWAPPED.try_take() {
+		// 	display.flush_ready();
+		// }
+
+		// info!("GUI loop completed, next timeout in {} ms", timeout_ms);
+
+		Timer::after_millis(timeout_ms as u64).await;
+
+		// display.refresh_now();
 	}
-}
-
-fn convert_adc_to_celsius(adc_value: u16) -> f32 {
-	let temp = 27.0 - (adc_value as f32 * 3.3 / 4096.0 - 0.706) / 0.001721;
-	let sign = if temp < 0.0 { -1.0 } else { 1.0 };
-	let rounded_temp_x10: i16 = ((temp * 10.0) + 0.5 * sign) as i16;
-	(rounded_temp_x10 as f32) / 10.0
 }

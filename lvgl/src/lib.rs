@@ -39,11 +39,11 @@ pub fn active_screen() -> Option<ObjRef<'static>> {
 
 /// Should be called periodically to allow LVGL to handle timers and other background tasks.
 /// Returns the number of milliseconds until the next timer is due, or None if there are no timers.
-pub fn timer_handler() -> Option<u32> {
+pub fn timer_handler() -> u32 {
 	let time_until_next = unsafe { lvgl_sys::lv_timer_handler() };
 	if time_until_next == u32::MAX {
-		None
+		lvgl_sys::LV_DEF_REFR_PERIOD
 	} else {
-		Some(time_until_next)
+		time_until_next
 	}
 }

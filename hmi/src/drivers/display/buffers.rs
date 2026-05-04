@@ -1,4 +1,13 @@
 use crate::utils::psram::PsramBuffer;
+use defmt::Format;
+
+#[derive(Format, Clone, Copy)]
+pub(crate) struct DoubleBufferPtrs<T> {
+	pub fb0: *mut T,
+	pub fb1: *mut T,
+}
+
+unsafe impl<T> Sync for DoubleBufferPtrs<T> {}
 
 pub(super) struct DoubleBuffers<const N: usize, T> {
 	fb0: PsramBuffer<T, N>,
@@ -16,8 +25,11 @@ impl<const N: usize, T> DoubleBuffers<N, T> {
 	}
 
 	#[allow(dead_code)]
-	pub fn ptrs_for_lvgl(&mut self) -> (*mut T, *mut T) {
-		(self.fb0.as_mut_ptr(), self.fb1.as_mut_ptr())
+	pub fn ptrs_for_lvgl(&mut self) -> DoubleBufferPtrs<T> {
+		DoubleBufferPtrs {
+			fb0: self.fb0.as_mut_ptr(),
+			fb1: self.fb1.as_mut_ptr(),
+		}
 	}
 
 	#[allow(dead_code)]

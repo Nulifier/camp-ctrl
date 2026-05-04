@@ -1,37 +1,33 @@
-use crate::utils::psram::PsramBuffer;
-use embassy_time::{Duration, Timer};
+use crate::drivers::display::{FRAME_PIXELS, get_frame_buffer_ptrs, request_frame_buffer_swap};
+use defmt::info;
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use lvgl::{display::DoubleBufferedDisplay, misc::color::Color16};
+use lvgl::{display::DoubleBufferedDisplay, misc::area::Area};
 
-const DISPLAY_BUF_SIZE: usize = DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize;
+pub type Display = DoubleBufferedDisplay<u16>;
 
-type DisplayColor = Color16;
-type DisplayBuffer = PsramBuffer<DisplayColor, DISPLAY_BUF_SIZE>;
-pub type Display = DoubleBufferedDisplay<DisplayColor>;
+fn flush_display(_area: &Area, _pixels: &[u16]) {
+	info!("Flushing display");
+	request_frame_buffer_swap();
+}
 
-// pub async fn flush_display()
+fn flush_wait_cb() {
+	info!("Waiting for display flush to complete");
+}
 
-pub fn create_rp_display() -> Display {
-	let mut buf0: DisplayBuffer = PsramBuffer::new().unwrap();
-	let mut buf1: DisplayBuffer = PsramBuffer::new().unwrap();
+pub async fn create_rp_display() -> Display {
+	let frame_buffers = get_frame_buffer_ptrs().await;
 
 	let display = unsafe {
 		DoubleBufferedDisplay::new(
 			DISPLAY_WIDTH as usize,
 			DISPLAY_HEIGHT as usize,
-			buf0.as_mut_ptr().cast(),
-			buf1.as_mut_ptr().cast(),
-			DISPLAY_BUF_SIZE,
-			|_, _| {}, // Dummy flush callback
-			Some(|| {
-				let _future = Timer::after(Duration::from_millis(10));
-
-				// future.await;
-			}),
+			frame_buffers.fb1, // Buffers are swapped so we draw to the back buffer
+			frame_buffers.fb0,
+			FRAME_PIXELS,
+			flush_display,
+			Some(flush_wait_cb),
 		)
 	};
-
-	buf0.as_mut().fill(Color16::from_rgb8(0, 0, 0));
 
 	display
 }

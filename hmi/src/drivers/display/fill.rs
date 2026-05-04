@@ -13,6 +13,10 @@ use crate::{
 const FRAME_BUFFER_CHUNKS: usize = FRAME_PIXELS / CHUNK_PIXELS;
 
 static SWAP_REQUESTED: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+/// Request that the fill engine swap the active frame buffer at the next frame start.
+pub fn request_frame_buffer_swap() {
+	SWAP_REQUESTED.signal(());
+}
 
 pub(super) struct FillEngine {
 	#[allow(dead_code)]
@@ -54,16 +58,14 @@ impl FillEngine {
 
 	pub fn on_vblank(&mut self) {}
 
-	/// Request that the fill engine swap the active frame buffer at the next frame start.
-	#[allow(dead_code)]
-	pub fn request_swap(&mut self) {
-		SWAP_REQUESTED.signal(());
-	}
-
 	/// Check if a swap was requested and swap if so.
-	pub fn swap_if_requested(&mut self) {
+	/// Returns true if a swap was performed, false otherwise.
+	pub fn swap_if_requested(&mut self) -> bool {
 		if let Some(_) = SWAP_REQUESTED.try_take() {
 			self.frame_buffers.swap();
+			true
+		} else {
+			false
 		}
 	}
 

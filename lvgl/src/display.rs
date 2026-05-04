@@ -2,6 +2,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use core::ptr::NonNull;
+use defmt::debug;
 
 use crate::{
 	AsRaw, AsRawMut,
@@ -56,6 +57,14 @@ pub trait LvDisplay: Sized + AsRaw<lvgl_sys::lv_disp_t> + AsRawMut<lvgl_sys::lv_
 		} else {
 			Some(unsafe { Self::_from_raw(disp) })
 		}
+	}
+
+	fn refresh_now(&mut self) {
+		unsafe { lvgl_sys::lv_refr_now(self.as_raw_mut()) };
+	}
+
+	fn flush_ready(&mut self) {
+		unsafe { lvgl_sys::lv_display_flush_ready(self.as_raw_mut()) };
 	}
 
 	fn set_resolution(&mut self, hor_res: i32, ver_res: i32) {
@@ -234,11 +243,15 @@ impl<C> DoubleBufferedDisplay<C> {
 		height: usize,
 		buf0: *mut C,
 		buf1: *mut C,
-		buf_size: usize,
+		buf_size_pixels: usize,
 		flush_cb: FlushCallback<C>,
 		flush_wait_cb: Option<FlushWaitCallback>,
 	) -> Self {
 		let display = unsafe { lvgl_sys::lv_display_create(width as i32, height as i32) };
+		let buf_size_bytes = buf_size_pixels
+			.checked_mul(core::mem::size_of::<C>())
+			.and_then(|n| u32::try_from(n).ok())
+			.expect("Display buffer size does not fit in u32 bytes");
 
 		if buf0.is_null() || buf1.is_null() {
 			panic!("Both display buffers must be non-null");
@@ -251,7 +264,7 @@ impl<C> DoubleBufferedDisplay<C> {
 		};
 
 		let callbacks = Box::new(DoubleBufferedDisplayCallbacks {
-			len: buf_size,
+			len: buf_size_pixels,
 			flush_cb,
 			flush_wait_cb,
 		});
@@ -261,7 +274,7 @@ impl<C> DoubleBufferedDisplay<C> {
 				display,
 				disp.buf0 as *mut core::ffi::c_void,
 				disp.buf1 as *mut core::ffi::c_void,
-				buf_size as u32,
+				buf_size_bytes,
 				lvgl_sys::lv_display_render_mode_t_LV_DISPLAY_RENDER_MODE_FULL,
 			);
 
@@ -306,6 +319,8 @@ unsafe extern "C" fn flush_trampoline<C>(
 }
 
 unsafe extern "C" fn flush_wait_trampoline<C>(disp: *mut lvgl_sys::lv_display_t) {
+	debug!("Flush wait trampoline called");
+
 	let callbacks_ptr = unsafe { lvgl_sys::lv_display_get_user_data(disp) }
 		as *const DoubleBufferedDisplayCallbacks<C>;
 

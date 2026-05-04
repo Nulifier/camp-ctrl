@@ -41,11 +41,13 @@ use crate::drivers::i2c::{self};
 pub static IMAGE_DEF: ImageDef = hal::block::ImageDef::secure_exe();
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
-static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
-static EXECUTOR1_HIGH: InterruptExecutor = InterruptExecutor::new();
-static EXECUTOR1_GUI: StaticCell<Executor> = StaticCell::new();
 
-const HEAP_SIZE: usize = 16 * 1024; // 32 KB
+static EXECUTOR0_HIGH: InterruptExecutor = InterruptExecutor::new();
+static EXECUTOR0_MED: InterruptExecutor = InterruptExecutor::new();
+static EXECUTOR0_LOW: StaticCell<Executor> = StaticCell::new();
+static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+
+const HEAP_SIZE: usize = 16 * 1024; // 16 KB
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
@@ -70,8 +72,13 @@ async fn dimmer() {
 }
 
 #[interrupt]
+unsafe fn SWI_IRQ_1() {
+	unsafe { EXECUTOR0_HIGH.on_interrupt() };
+}
+
+#[interrupt]
 unsafe fn SWI_IRQ_0() {
-	unsafe { EXECUTOR1_HIGH.on_interrupt() };
+	unsafe { EXECUTOR0_MED.on_interrupt() };
 }
 
 #[cortex_m_rt::entry]
@@ -104,44 +111,50 @@ fn main() -> ! {
 		p.CORE1,
 		unsafe { &mut *addr_of_mut!(CORE1_STACK) },
 		move || {
-			// Setup the executor for core 1 to run higher priority tasks
-			interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P2);
-			let spawner1_high = EXECUTOR1_HIGH.start(interrupt::SWI_IRQ_0);
-			spawner1_high.spawn(unwrap!(display_task(
-				r.display_ctrl,
-				r.display_timing,
-				r.display_data,
-				r.display_fill,
-			)));
-
 			// Run the GUI on core 1 at lower priority
-			let executor1_gui = EXECUTOR1_GUI.init(Executor::new());
+			let executor1_gui = EXECUTOR1.init(Executor::new());
 			executor1_gui.run(|spawner1_low| {
 				//////////////////////////////////////////////////////////////
 				// Core1: UI and related tasks
-				spawner1_low.spawn(unwrap!(gui_task(r.system)));
+				// spawner1_low.spawn(unwrap!(gui_task(r.system)));
+				spawner1_low.spawn(unwrap!(display_task(
+					r.display_ctrl,
+					r.display_timing,
+					r.display_data,
+					r.display_fill,
+				)));
 			})
 		},
 	);
 
-	let executor0 = EXECUTOR0.init(Executor::new());
-	executor0.run(|spawner| {
-		//////////////////////////////////////////////////////////////
-		// Core0: Drivers and services
+	let i2c = i2c::init(r.i2c1);
 
-		let i2c = i2c::init(r.i2c1);
+	// Setup the executor for core 1 to run higher priority tasks
+	interrupt::SWI_IRQ_1.set_priority(interrupt::Priority::P2);
+	{
+		let spawner1_high = EXECUTOR0_HIGH.start(interrupt::SWI_IRQ_1);
+	}
 
-		spawner.spawn(unwrap!(backlight_task(r.backlight)));
+	interrupt::SWI_IRQ_0.set_priority(interrupt::Priority::P3);
+	{
+		let spawner1_med = EXECUTOR0_MED.start(interrupt::SWI_IRQ_0);
 
-		spawner.spawn(unwrap!(services::touch_task::touch_task(
-			// r.touch.tp_rst.into(),
-			// r.touch.tp_int.into(),
-			I2cDevice::new(i2c),
-			r.touch,
-		)));
+		spawner1_med.spawn(unwrap!(backlight_task(r.backlight)));
 
-		spawner.spawn(unwrap!(dimmer()));
-		spawner.spawn(unwrap!(wake_screen()));
+		// spawner1_med.spawn(unwrap!(services::touch_task::touch_task(
+		// 	// r.touch.tp_rst.into(),
+		// 	// r.touch.tp_int.into(),
+		// 	I2cDevice::new(i2c),
+		// 	r.touch,
+		// )));
+
+		// spawner1_med.spawn(unwrap!(dimmer()));
+		// spawner1_med.spawn(unwrap!(wake_screen()));
+	}
+
+	let executor0 = EXECUTOR0_LOW.init(Executor::new());
+	executor0.run(|spawner0_low| {
+		spawner0_low.spawn(unwrap!(gui_task()));
 	});
 }
 

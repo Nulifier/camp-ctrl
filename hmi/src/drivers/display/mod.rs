@@ -1,5 +1,7 @@
-use defmt::{info, unwrap};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel};
+use defmt::{debug, info, unwrap};
+use embassy_sync::{
+	blocking_mutex::raw::CriticalSectionRawMutex, channel, once_lock::OnceLock, signal::Signal,
+};
 use hmi_gui::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 use crate::{
@@ -20,15 +22,24 @@ mod timing;
 
 const PCLK_FREQUENCY: u32 = 25_000_000; // 25 MHz
 
-const FRAME_PIXELS: usize = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
+pub const FRAME_PIXELS: usize = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
 
 type FrameBuffers = DoubleBuffers<{ FRAME_PIXELS }, u16>;
+
+pub use fill::request_frame_buffer_swap;
+
+pub static FRAME_BUFFER_SWAPPED: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 static FREE_CHUNKS: channel::Channel<
 	CriticalSectionRawMutex,
 	usize,
 	{ chunks::CHUNK_BUFFER_COUNT },
 > = channel::Channel::new();
+
+static FRAME_BUFFER_PTRS: OnceLock<buffers::DoubleBufferPtrs<u16>> = OnceLock::new();
+pub(crate) async fn get_frame_buffer_ptrs() -> buffers::DoubleBufferPtrs<u16> {
+	FRAME_BUFFER_PTRS.get().await.clone()
+}
 
 #[embassy_executor::task]
 pub async fn display_task(
@@ -47,6 +58,8 @@ pub async fn display_task(
 		frame_buffers.active_slice_mut()
 	});
 	test_patterns::fill_frame_buffers_with_test_pattern(frame_buffers.back_slice_mut());
+
+	unwrap!(FRAME_BUFFER_PTRS.init(frame_buffers.ptrs_for_lvgl()));
 
 	// Create the chunk buffers
 	let chunks = init_chunk_pool();
@@ -97,8 +110,11 @@ pub async fn display_task(
 			fill_engine.fill_next_chunk(frame_buffer_index);
 		}
 
-		// Check if a swap was requested during the VBLANK and swap if so
-		fill_engine.swap_if_requested();
+		// Check if a swap was requested and swap if so
+		if fill_engine.swap_if_requested() {
+			// debug!("Frame buffer swap requested, swapping now");
+			FRAME_BUFFER_SWAPPED.signal(());
+		}
 
 		// Fill the first chunk of the next frame while the last chunk of the current frame is being pushed to the PIO
 		{
