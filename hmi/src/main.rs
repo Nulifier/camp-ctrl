@@ -141,12 +141,10 @@ fn main() -> ! {
 
 		spawner1_med.spawn(unwrap!(backlight_task(r.backlight)));
 
-		// spawner1_med.spawn(unwrap!(services::touch_task::touch_task(
-		// 	// r.touch.tp_rst.into(),
-		// 	// r.touch.tp_int.into(),
-		// 	I2cDevice::new(i2c),
-		// 	r.touch,
-		// )));
+		spawner1_med.spawn(unwrap!(services::touch_task::touch_task(
+			I2cDevice::new(i2c),
+			r.touch,
+		)));
 
 		// spawner1_med.spawn(unwrap!(dimmer()));
 		// spawner1_med.spawn(unwrap!(wake_screen()));

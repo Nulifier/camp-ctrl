@@ -108,6 +108,9 @@ pub async fn display_task(
 
 		while let Some(frame_buffer_index) = fill_engine.get_next_frame_buffer_index() {
 			fill_engine.fill_next_chunk(frame_buffer_index);
+
+			// Wait for chunk to be filled
+			let _ = FREE_CHUNKS.receive().await;
 		}
 
 		// Check if a swap was requested and swap if so
